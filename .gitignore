@@ -1,0 +1,87 @@
+# ==========================================
+# Terraform
+# ==========================================
+
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+
+# Keep Terraform provider lock files in Git.
+# .terraform.lock.hcl should normally be committed.
+
+
+# ==========================================
+# Terraform variable files containing secrets
+# ==========================================
+
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Allow sanitized example variable files
+!*.example.tfvars
+!*.tfvars.example
+
+
+# ==========================================
+# Azure
+# ==========================================
+
+.azure/
+
+
+# ==========================================
+# Kubernetes
+# ==========================================
+
+*.kubeconfig
+
+
+# ==========================================
+# Environment files
+# ==========================================
+
+.env
+.env.*
+!.env.example
+
+
+# ==========================================
+# Certificates / private keys
+# ==========================================
+
+*.pem
+*.key
+*.pfx
+*.p12
+
+
+# ==========================================
+# IDE
+# ==========================================
+
+.vscode/
+.idea/
+
+
+# ==========================================
+# OS
+# ==========================================
+
+.DS_Store
+Thumbs.db
+
+
+# ==========================================
+# Temporary files
+# ==========================================
+
+*.tmp
+*.bak
+*.swp
+*~
