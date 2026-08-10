@@ -46,3 +46,16 @@ module "acr" {
   sku  = "Standard"
   tags = local.common_tags
 }
+
+module "identity" {
+  source = "../../modules/identity"
+
+  resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+
+  project_name   = var.project_name
+  environment    = var.environment
+  location_short = local.location_short
+
+  tags = local.common_tags
+}

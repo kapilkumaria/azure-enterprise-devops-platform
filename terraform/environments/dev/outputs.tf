@@ -37,3 +37,23 @@ output "acr_login_server" {
   description = "Azure Container Registry login server."
   value       = module.acr.login_server
 }
+
+output "aks_control_plane_identity_id" {
+  description = "AKS control-plane managed identity resource ID."
+  value       = module.identity.aks_control_plane_identity_id
+}
+
+output "aks_control_plane_client_id" {
+  description = "AKS control-plane managed identity client ID."
+  value       = module.identity.aks_control_plane_client_id
+}
+
+output "workload_identity_id" {
+  description = "Application workload managed identity resource ID."
+  value       = module.identity.workload_identity_id
+}
+
+output "workload_client_id" {
+  description = "Application workload managed identity client ID."
+  value       = module.identity.workload_client_id
+}
