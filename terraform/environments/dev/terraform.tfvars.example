@@ -1,0 +1,6 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+location     = "canadacentral"
+environment  = "dev"
+project_name = "aedp"
+owner        = "kapil"
