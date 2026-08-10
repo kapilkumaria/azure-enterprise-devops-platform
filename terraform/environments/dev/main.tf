@@ -26,3 +26,23 @@ module "networking" {
 
   tags = local.common_tags
 }
+
+resource "random_string" "acr_suffix" {
+  length  = 6
+  upper   = false
+  special = false
+}
+
+module "acr" {
+  source = "../../modules/acr"
+
+  resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+
+  project_name  = var.project_name
+  environment   = var.environment
+  unique_suffix = random_string.acr_suffix.result
+
+  sku  = "Standard"
+  tags = local.common_tags
+}
