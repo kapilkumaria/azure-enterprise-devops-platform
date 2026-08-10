@@ -87,3 +87,8 @@ output "aks_user_node_pool_name" {
   description = "AKS application user node pool name."
   value       = module.aks.user_node_pool_name
 }
+
+output "workload_federated_identity_credential_id" {
+  description = "Federated credential connecting AKS ServiceAccount to Azure managed identity."
+  value       = azurerm_federated_identity_credential.workload.id
+}

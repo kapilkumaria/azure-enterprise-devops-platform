@@ -99,6 +99,20 @@ module "aks" {
   ]
 }
 
+resource "azurerm_federated_identity_credential" "workload" {
+  name = "fic-${var.project_name}-${var.environment}-workload"
+
+  user_assigned_identity_id = module.identity.workload_identity_id
+
+  issuer = module.aks.oidc_issuer_url
+
+  audience = [
+    "api://AzureADTokenExchange"
+  ]
+
+  subject = "system:serviceaccount:applications:workload-identity-sa"
+}
+
 resource "azurerm_role_assignment" "aks_acr_pull" {
   scope = module.acr.id
 
