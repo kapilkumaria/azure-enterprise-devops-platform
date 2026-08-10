@@ -70,6 +70,8 @@ module "aks" {
   environment    = var.environment
   location_short = local.location_short
 
+  tenant_id = var.tenant_id
+
   aks_subnet_id = module.networking.aks_subnet_id
 
   control_plane_identity_id = module.identity.aks_control_plane_identity_id

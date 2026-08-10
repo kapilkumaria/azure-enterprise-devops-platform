@@ -44,3 +44,8 @@ variable "private_endpoint_subnet_prefixes" {
   type        = list(string)
   default     = ["10.20.16.0/24"]
 }
+
+variable "tenant_id" {
+  description = "Microsoft Entra tenant ID."
+  type        = string
+}

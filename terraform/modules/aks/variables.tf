@@ -116,3 +116,8 @@ variable "user_node_auto_scaling_enabled" {
   type        = bool
   default     = true
 }
+
+variable "tenant_id" {
+  description = "Microsoft Entra tenant ID used for AKS authentication."
+  type        = string
+}
