@@ -59,3 +59,50 @@ module "identity" {
 
   tags = local.common_tags
 }
+
+module "aks" {
+  source = "../../modules/aks"
+
+  resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+
+  project_name   = var.project_name
+  environment    = var.environment
+  location_short = local.location_short
+
+  aks_subnet_id = module.networking.aks_subnet_id
+
+  control_plane_identity_id = module.identity.aks_control_plane_identity_id
+
+  node_vm_size = "Standard_D4s_v6"
+
+  system_node_count                = 2
+  system_node_auto_scaling_enabled = false
+
+
+  pod_cidr       = "10.244.0.0/16"
+  service_cidr   = "10.0.0.0/16"
+  dns_service_ip = "10.0.0.10"
+
+  tags = local.common_tags
+
+  depends_on = [
+    azurerm_role_assignment.aks_network_contributor
+  ]
+}
+
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  scope = module.acr.id
+
+  role_definition_name = "AcrPull"
+
+  principal_id = module.aks.kubelet_identity_object_id
+}
+
+resource "azurerm_role_assignment" "aks_network_contributor" {
+  scope = module.networking.aks_subnet_id
+
+  role_definition_name = "Network Contributor"
+
+  principal_id = module.identity.aks_control_plane_principal_id
+}

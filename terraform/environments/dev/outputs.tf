@@ -57,3 +57,28 @@ output "workload_client_id" {
   description = "Application workload managed identity client ID."
   value       = module.identity.workload_client_id
 }
+
+output "aks_id" {
+  description = "AKS cluster resource ID."
+  value       = module.aks.id
+}
+
+output "aks_name" {
+  description = "AKS cluster name."
+  value       = module.aks.name
+}
+
+output "aks_fqdn" {
+  description = "AKS API server FQDN."
+  value       = module.aks.fqdn
+}
+
+output "aks_oidc_issuer_url" {
+  description = "AKS OIDC issuer URL used for Workload Identity."
+  value       = module.aks.oidc_issuer_url
+}
+
+output "aks_kubelet_identity_object_id" {
+  description = "Object ID of the AKS kubelet managed identity."
+  value       = module.aks.kubelet_identity_object_id
+}
