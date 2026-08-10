@@ -27,3 +27,13 @@ output "kubelet_identity_client_id" {
   description = "Client ID of the AKS kubelet managed identity."
   value       = azurerm_kubernetes_cluster.this.kubelet_identity[0].client_id
 }
+
+output "user_node_pool_id" {
+  description = "Resource ID of the AKS user node pool."
+  value       = azurerm_kubernetes_cluster_node_pool.user.id
+}
+
+output "user_node_pool_name" {
+  description = "Name of the AKS user node pool."
+  value       = azurerm_kubernetes_cluster_node_pool.user.name
+}

@@ -79,6 +79,12 @@ module "aks" {
   system_node_count                = 2
   system_node_auto_scaling_enabled = false
 
+  user_node_vm_size = "Standard_D4as_v4"
+
+  user_node_count                = 1
+  user_node_min_count            = 1
+  user_node_max_count            = 2
+  user_node_auto_scaling_enabled = true
 
   pod_cidr       = "10.244.0.0/16"
   service_cidr   = "10.0.0.0/16"

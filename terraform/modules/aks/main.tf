@@ -61,3 +61,31 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   tags = var.tags
 }
+
+resource "azurerm_kubernetes_cluster_node_pool" "user" {
+  name = "user"
+
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
+
+  vm_size = var.user_node_vm_size
+
+  vnet_subnet_id = var.aks_subnet_id
+
+  mode = "User"
+
+  auto_scaling_enabled = var.user_node_auto_scaling_enabled
+
+  min_count  = var.user_node_min_count
+  max_count  = var.user_node_max_count
+  node_count = var.user_node_count
+
+  node_labels = {
+    "workload" = "applications"
+  }
+
+  upgrade_settings {
+    max_surge = "33%"
+  }
+
+  tags = var.tags
+}

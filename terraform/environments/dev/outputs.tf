@@ -82,3 +82,8 @@ output "aks_kubelet_identity_object_id" {
   description = "Object ID of the AKS kubelet managed identity."
   value       = module.aks.kubelet_identity_object_id
 }
+
+output "aks_user_node_pool_name" {
+  description = "AKS application user node pool name."
+  value       = module.aks.user_node_pool_name
+}

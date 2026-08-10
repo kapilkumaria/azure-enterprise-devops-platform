@@ -86,3 +86,33 @@ variable "system_node_auto_scaling_enabled" {
   type        = bool
   default     = false
 }
+
+variable "user_node_vm_size" {
+  description = "VM size used for the AKS user node pool."
+  type        = string
+  default     = "Standard_D4as_v4"
+}
+
+variable "user_node_count" {
+  description = "Initial number of nodes in the AKS user node pool."
+  type        = number
+  default     = 1
+}
+
+variable "user_node_min_count" {
+  description = "Minimum number of nodes in the AKS user node pool."
+  type        = number
+  default     = 1
+}
+
+variable "user_node_max_count" {
+  description = "Maximum number of nodes in the AKS user node pool."
+  type        = number
+  default     = 2
+}
+
+variable "user_node_auto_scaling_enabled" {
+  description = "Whether cluster autoscaling is enabled for the AKS user node pool."
+  type        = bool
+  default     = true
+}
