@@ -92,3 +92,18 @@ output "workload_federated_identity_credential_id" {
   description = "Federated credential connecting AKS ServiceAccount to Azure managed identity."
   value       = azurerm_federated_identity_credential.workload.id
 }
+
+output "key_vault_id" {
+  description = "Azure Key Vault resource ID."
+  value       = module.key_vault.id
+}
+
+output "key_vault_name" {
+  description = "Azure Key Vault name."
+  value       = module.key_vault.name
+}
+
+output "key_vault_uri" {
+  description = "Azure Key Vault URI."
+  value       = module.key_vault.vault_uri
+}

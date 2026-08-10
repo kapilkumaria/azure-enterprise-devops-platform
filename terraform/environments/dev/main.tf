@@ -128,3 +128,31 @@ resource "azurerm_role_assignment" "aks_network_contributor" {
 
   principal_id = module.identity.aks_control_plane_principal_id
 }
+
+resource "random_string" "key_vault_suffix" {
+  length  = 6
+  upper   = false
+  special = false
+}
+
+module "key_vault" {
+  source = "../../modules/key-vault"
+
+  resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+  tenant_id           = var.tenant_id
+
+  project_name  = var.project_name
+  environment   = var.environment
+  unique_suffix = random_string.key_vault_suffix.result
+
+  tags = local.common_tags
+}
+
+resource "azurerm_role_assignment" "workload_key_vault_secrets_user" {
+  scope = module.key_vault.id
+
+  role_definition_name = "Key Vault Secrets User"
+
+  principal_id = module.identity.workload_principal_id
+}
