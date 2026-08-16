@@ -20,7 +20,7 @@ pr:
 
 
 pool:
-  vmImage: ubuntu-latest
+  name: aedp-linux-pool
 
 
 variables:
