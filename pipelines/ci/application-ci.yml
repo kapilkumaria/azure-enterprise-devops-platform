@@ -1,0 +1,157 @@
+trigger:
+  branches:
+    include:
+      - main
+
+  paths:
+    include:
+      - application/*
+      - pipelines/ci/application-ci.yml
+
+pr:
+  branches:
+    include:
+      - main
+
+  paths:
+    include:
+      - application/*
+      - pipelines/ci/application-ci.yml
+
+
+pool:
+  vmImage: ubuntu-latest
+
+
+variables:
+  azureServiceConnection: sc-aedp-azure-wif
+
+  acrName: acraedpdevn47nuz
+  acrLoginServer: acraedpdevn47nuz.azurecr.io
+
+  imageRepository: azure-enterprise-demo
+
+  imageTag: $(Build.BuildId)
+
+  dockerfilePath: $(Build.SourcesDirectory)/application/Dockerfile
+
+  buildContext: $(Build.SourcesDirectory)/application
+
+
+stages:
+
+  - stage: Validate
+    displayName: Validate application
+
+    jobs:
+
+      - job: ValidateApplication
+        displayName: Validate Python application
+
+        steps:
+
+          - checkout: self
+            clean: true
+
+          - task: UsePythonVersion@0
+            displayName: Use Python 3.12
+            inputs:
+              versionSpec: '3.12'
+
+          - script: |
+              python --version
+
+              python -m pip install \
+                --upgrade pip
+
+              pip install \
+                -r application/requirements.txt
+
+              python -m compileall application/src
+            displayName: Install dependencies and validate source
+
+
+  - stage: Build
+    displayName: Build container
+    dependsOn: Validate
+
+    jobs:
+
+      - job: BuildContainer
+        displayName: Build Docker image
+
+        steps:
+
+          - checkout: self
+            clean: true
+
+          - script: |
+              docker build \
+                --file "$(dockerfilePath)" \
+                --tag "$(acrLoginServer)/$(imageRepository):$(imageTag)" \
+                "$(buildContext)"
+            displayName: Build application image
+
+          - script: |
+              docker image inspect \
+                "$(acrLoginServer)/$(imageRepository):$(imageTag)"
+            displayName: Verify image
+
+
+  - stage: Push
+    displayName: Push image to ACR
+    dependsOn: Build
+
+    jobs:
+
+      - job: PushContainer
+        displayName: Authenticate and push image
+
+        steps:
+
+          - checkout: self
+            clean: true
+
+          - task: AzureCLI@2
+            displayName: Authenticate to Azure and ACR
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                echo "Azure authentication succeeded"
+
+                az account show \
+                  --query '{
+                    Subscription:name,
+                    SubscriptionId:id,
+                    Tenant:tenantId
+                  }' \
+                  -o table
+
+                az acr login \
+                  --name "$(acrName)"
+
+          - script: |
+              docker build \
+                --file "$(dockerfilePath)" \
+                --tag "$(acrLoginServer)/$(imageRepository):$(imageTag)" \
+                "$(buildContext)"
+
+              docker push \
+                "$(acrLoginServer)/$(imageRepository):$(imageTag)"
+            displayName: Build and push immutable image
+
+          - task: AzureCLI@2
+            displayName: Verify image in ACR
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az acr repository show-tags \
+                  --name "$(acrName)" \
+                  --repository "$(imageRepository)" \
+                  --orderby time_desc \
+                  --top 10 \
+                  -o table
