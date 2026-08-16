@@ -17,7 +17,9 @@ variables:
 
   resourceGroup: rg-aedp-dev-cac
   aksCluster: aks-aedp-dev-cac
-  namespace: applications
+
+  devNamespace: applications
+  stagingNamespace: applications-staging
 
   acrLoginServer: acraedpdevn47nuz.azurecr.io
   imageRepository: azure-enterprise-demo
@@ -26,13 +28,13 @@ variables:
 
 stages:
 
-  - stage: Deploy
-    displayName: Deploy application to AKS
+  - stage: DeployDev
+    displayName: Deploy to dev
 
     jobs:
 
-      - deployment: DeployApplication
-        displayName: Deploy immutable image
+      - deployment: DeployDevApplication
+        displayName: Deploy immutable image to dev
         environment: aedp-dev
 
         strategy:
@@ -62,7 +64,7 @@ stages:
                         }' \
                         -o table
 
-                      echo "===== Get AKS credentials ====="
+                      echo "===== Configure AKS credentials ====="
 
                       az aks get-credentials \
                         --resource-group "$(resourceGroup)" \
@@ -71,63 +73,160 @@ stages:
 
                       kubelogin convert-kubeconfig -l azurecli
 
-                      echo "===== Verify AKS authorization ====="
+                      echo "===== Verify dev namespace authorization ====="
 
                       kubectl auth can-i get deployments \
-                        -n "$(namespace)"
+                        -n "$(devNamespace)"
 
                       kubectl auth can-i patch deployments \
-                        -n "$(namespace)"
+                        -n "$(devNamespace)"
 
                       kubectl get deployment \
                         azure-enterprise-demo \
-                        -n "$(namespace)"
+                        -n "$(devNamespace)"
 
                 - script: |
                     set -euo pipefail
 
-                    echo "===== Current image ====="
-
-                    kubectl get deployment \
-                      azure-enterprise-demo \
-                      -n "$(namespace)" \
-                      -o jsonpath='{.spec.template.spec.containers[0].image}'
-
-                    echo
-
-                    echo "===== CI pipeline metadata ====="
+                    echo "===== CI artifact metadata ====="
                     echo "Trigger reason: $(Build.Reason)"
                     echo "CI pipeline: $(resources.pipeline.ci.pipelineName)"
                     echo "CI Run ID / Image Tag: $(resources.pipeline.ci.runID)"
                     echo "CI branch: $(resources.pipeline.ci.sourceBranch)"
                     echo "CI commit: $(resources.pipeline.ci.sourceCommit)"
 
-                    echo "===== Deploy new image ====="
+                    echo "===== Current dev image ====="
+
+                    kubectl get deployment \
+                      azure-enterprise-demo \
+                      -n "$(devNamespace)" \
+                      -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+                    echo
+
+                    echo "===== Deploy immutable image to dev ====="
 
                     kubectl set image \
                       deployment/azure-enterprise-demo \
                       application="$(acrLoginServer)/$(imageRepository):$(imageTag)" \
-                      -n "$(namespace)"
+                      -n "$(devNamespace)"
 
-                    echo "===== Wait for rollout ====="
+                    echo "===== Wait for dev rollout ====="
 
                     kubectl rollout status \
                       deployment/azure-enterprise-demo \
-                      -n "$(namespace)" \
+                      -n "$(devNamespace)" \
                       --timeout=180s
 
-                    echo "===== Running pods ====="
+                    echo "===== Verify dev pods ====="
 
                     kubectl get pods \
-                      -n "$(namespace)" \
+                      -n "$(devNamespace)" \
                       -l app=azure-enterprise-demo \
                       -o wide
 
-                    echo "===== Running image ====="
+                    echo "===== Verify dev image ====="
 
                     kubectl get pods \
-                      -n "$(namespace)" \
+                      -n "$(devNamespace)" \
                       -l app=azure-enterprise-demo \
                       -o jsonpath='{range .items[*]}{.metadata.name}{" -> "}{.spec.containers[0].image}{"\n"}{end}'
 
-                  displayName: Deploy and verify application
+                  displayName: Deploy and verify dev
+
+
+  - stage: DeployStaging
+    displayName: Promote to staging
+    dependsOn: DeployDev
+    condition: succeeded()
+
+    jobs:
+
+      - deployment: DeployStagingApplication
+        displayName: Deploy same immutable image to staging
+        environment: aedp-staging
+
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+
+                - checkout: self
+                  clean: true
+
+                - task: AzureCLI@2
+                  displayName: Authenticate to Azure and configure AKS
+                  inputs:
+                    azureSubscription: $(azureServiceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      set -euo pipefail
+
+                      echo "===== Configure AKS credentials ====="
+
+                      az aks get-credentials \
+                        --resource-group "$(resourceGroup)" \
+                        --name "$(aksCluster)" \
+                        --overwrite-existing
+
+                      kubelogin convert-kubeconfig -l azurecli
+
+                      echo "===== Verify staging namespace authorization ====="
+
+                      kubectl auth can-i get deployments \
+                        -n "$(stagingNamespace)"
+
+                      kubectl auth can-i patch deployments \
+                        -n "$(stagingNamespace)"
+
+                      kubectl get deployment \
+                        azure-enterprise-demo \
+                        -n "$(stagingNamespace)"
+
+                - script: |
+                    set -euo pipefail
+
+                    echo "===== Promote exact CI artifact ====="
+                    echo "CI Run ID / Image Tag: $(resources.pipeline.ci.runID)"
+                    echo "CI branch: $(resources.pipeline.ci.sourceBranch)"
+                    echo "CI commit: $(resources.pipeline.ci.sourceCommit)"
+
+                    echo "===== Current staging image ====="
+
+                    kubectl get deployment \
+                      azure-enterprise-demo \
+                      -n "$(stagingNamespace)" \
+                      -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+                    echo
+
+                    echo "===== Deploy same immutable image to staging ====="
+
+                    kubectl set image \
+                      deployment/azure-enterprise-demo \
+                      application="$(acrLoginServer)/$(imageRepository):$(imageTag)" \
+                      -n "$(stagingNamespace)"
+
+                    echo "===== Wait for staging rollout ====="
+
+                    kubectl rollout status \
+                      deployment/azure-enterprise-demo \
+                      -n "$(stagingNamespace)" \
+                      --timeout=180s
+
+                    echo "===== Verify staging pods ====="
+
+                    kubectl get pods \
+                      -n "$(stagingNamespace)" \
+                      -l app=azure-enterprise-demo \
+                      -o wide
+
+                    echo "===== Verify staging image ====="
+
+                    kubectl get pods \
+                      -n "$(stagingNamespace)" \
+                      -l app=azure-enterprise-demo \
+                      -o jsonpath='{range .items[*]}{.metadata.name}{" -> "}{.spec.containers[0].image}{"\n"}{end}'
+
+                  displayName: Deploy and verify staging
