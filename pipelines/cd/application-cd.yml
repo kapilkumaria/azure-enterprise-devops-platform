@@ -1,5 +1,14 @@
 trigger: none
 
+resources:
+  pipelines:
+    - pipeline: ci
+      source: aedp-application-ci
+      trigger:
+        branches:
+          include:
+            - main
+
 pool:
   name: aedp-linux-pool
 
@@ -13,7 +22,7 @@ variables:
   acrLoginServer: acraedpdevn47nuz.azurecr.io
   imageRepository: azure-enterprise-demo
 
-  imageTag: '41'
+  imageTag: $(resources.pipeline.ci.runID)
 
 stages:
 
@@ -81,6 +90,13 @@ stages:
                 -o jsonpath='{.spec.template.spec.containers[0].image}'
 
               echo
+
+              echo "===== CI pipeline metadata ====="
+              echo "Trigger reason: $(Build.Reason)"
+              echo "CI pipeline: $(resources.pipeline.ci.pipelineName)"
+              echo "CI Run ID / Image Tag: $(resources.pipeline.ci.runID)"
+              echo "CI branch: $(resources.pipeline.ci.sourceBranch)"
+              echo "CI commit: $(resources.pipeline.ci.sourceCommit)"
 
               echo "===== Deploy new image ====="
 
