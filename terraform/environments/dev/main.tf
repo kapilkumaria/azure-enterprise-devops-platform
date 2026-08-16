@@ -113,6 +113,22 @@ resource "azurerm_federated_identity_credential" "workload" {
   subject = "system:serviceaccount:applications:workload-identity-sa"
 }
 
+
+resource "azurerm_federated_identity_credential" "workload_staging" {
+  name = "fic-${var.project_name}-${var.environment}-workload-staging"
+
+  user_assigned_identity_id = module.identity.workload_identity_id
+
+  issuer = module.aks.oidc_issuer_url
+
+  audience = [
+    "api://AzureADTokenExchange"
+  ]
+
+  subject = "system:serviceaccount:applications-staging:workload-identity-sa"
+}
+
+
 resource "azurerm_role_assignment" "aks_acr_pull" {
   scope = module.acr.id
 
