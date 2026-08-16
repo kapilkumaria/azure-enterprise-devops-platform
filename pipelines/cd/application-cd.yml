@@ -58,9 +58,17 @@ stages:
 
                 kubelogin convert-kubeconfig -l azurecli
 
-                echo "===== Verify cluster access ====="
+                echo "===== Verify AKS authorization ====="
 
-                kubectl get nodes
+                kubectl auth can-i get deployments \
+                  -n "$(namespace)"
+
+                kubectl auth can-i patch deployments \
+                  -n "$(namespace)"
+
+                kubectl get deployment \
+                  azure-enterprise-demo \
+                  -n "$(namespace)"
 
           - script: |
               set -euo pipefail
