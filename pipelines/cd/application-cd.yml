@@ -1,0 +1,105 @@
+trigger: none
+
+pool:
+  name: aedp-linux-pool
+
+variables:
+  azureServiceConnection: sc-aedp-azure-wif
+
+  resourceGroup: rg-aedp-dev-cac
+  aksCluster: aks-aedp-dev-cac
+  namespace: applications
+
+  acrLoginServer: acraedpdevn47nuz.azurecr.io
+  imageRepository: azure-enterprise-demo
+
+  imageTag: '41'
+
+stages:
+
+  - stage: Deploy
+    displayName: Deploy application to AKS
+
+    jobs:
+
+      - job: DeployApplication
+        displayName: Deploy immutable image
+
+        steps:
+
+          - checkout: self
+            clean: true
+
+          - task: AzureCLI@2
+            displayName: Authenticate to Azure and configure AKS
+            inputs:
+              azureSubscription: $(azureServiceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+
+                echo "===== Azure identity ====="
+
+                az account show \
+                  --query '{
+                    Subscription:name,
+                    SubscriptionId:id,
+                    Tenant:tenantId
+                  }' \
+                  -o table
+
+                echo "===== Get AKS credentials ====="
+
+                az aks get-credentials \
+                  --resource-group "$(resourceGroup)" \
+                  --name "$(aksCluster)" \
+                  --overwrite-existing
+
+                kubelogin convert-kubeconfig -l azurecli
+
+                echo "===== Verify cluster access ====="
+
+                kubectl get nodes
+
+          - script: |
+              set -euo pipefail
+
+              echo "===== Current image ====="
+
+              kubectl get deployment \
+                azure-enterprise-demo \
+                -n "$(namespace)" \
+                -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+              echo
+
+              echo "===== Deploy new image ====="
+
+              kubectl set image \
+                deployment/azure-enterprise-demo \
+                application="$(acrLoginServer)/$(imageRepository):$(imageTag)" \
+                -n "$(namespace)"
+
+              echo "===== Wait for rollout ====="
+
+              kubectl rollout status \
+                deployment/azure-enterprise-demo \
+                -n "$(namespace)" \
+                --timeout=180s
+
+              echo "===== Running pods ====="
+
+              kubectl get pods \
+                -n "$(namespace)" \
+                -l app=azure-enterprise-demo \
+                -o wide
+
+              echo "===== Running image ====="
+
+              kubectl get pods \
+                -n "$(namespace)" \
+                -l app=azure-enterprise-demo \
+                -o jsonpath='{range .items[*]}{.metadata.name}{" -> "}{.spec.containers[0].image}{"\n"}{end}'
+
+            displayName: Deploy and verify application
