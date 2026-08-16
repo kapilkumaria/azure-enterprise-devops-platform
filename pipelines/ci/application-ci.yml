@@ -59,15 +59,20 @@ stages:
               versionSpec: '3.12'
 
           - script: |
-              python --version
+              python3 --version
+              python3 -m pip --version
+            displayName: Verify Python
 
-              python -m pip install \
+          - script: |
+              python3 --version
+
+              python3 -m pip install \
                 --upgrade pip
 
-              pip install \
+              python3 -m pip install \
                 -r application/requirements.txt
 
-              python -m compileall application/src
+              python3 -m compileall application/src
             displayName: Install dependencies and validate source
 
 
