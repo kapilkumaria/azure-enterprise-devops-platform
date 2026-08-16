@@ -15,6 +15,10 @@ resource "azurerm_kubernetes_cluster" "this" {
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
 
+  key_vault_secrets_provider {
+    secret_rotation_enabled = true
+  }
+
   role_based_access_control_enabled = true
 
   azure_active_directory_role_based_access_control {
