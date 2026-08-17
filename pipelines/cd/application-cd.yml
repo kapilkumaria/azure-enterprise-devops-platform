@@ -46,95 +46,16 @@ stages:
                 - checkout: self
                   clean: true
 
-                - task: AzureCLI@2
-                  displayName: Authenticate to Azure and configure AKS
-                  inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      set -euo pipefail
-
-                      echo "===== Azure identity ====="
-
-                      az account show \
-                        --query '{
-                          Subscription:name,
-                          SubscriptionId:id,
-                          Tenant:tenantId
-                        }' \
-                        -o table
-
-                      echo "===== Configure AKS credentials ====="
-
-                      az aks get-credentials \
-                        --resource-group "$(resourceGroup)" \
-                        --name "$(aksCluster)" \
-                        --overwrite-existing
-
-                      kubelogin convert-kubeconfig -l azurecli
-
-                      echo "===== Verify dev namespace authorization ====="
-
-                      kubectl auth can-i get deployments \
-                        -n "$(devNamespace)"
-
-                      kubectl auth can-i patch deployments \
-                        -n "$(devNamespace)"
-
-                      kubectl get deployment \
-                        azure-enterprise-demo \
-                        -n "$(devNamespace)"
-
-                - script: |
-                    set -euo pipefail
-
-                    echo "===== CI artifact metadata ====="
-                    echo "Trigger reason: $(Build.Reason)"
-                    echo "CI pipeline: $(resources.pipeline.ci.pipelineName)"
-                    echo "CI Run ID / Image Tag: $(resources.pipeline.ci.runID)"
-                    echo "CI branch: $(resources.pipeline.ci.sourceBranch)"
-                    echo "CI commit: $(resources.pipeline.ci.sourceCommit)"
-
-                    echo "===== Current dev image ====="
-
-                    kubectl get deployment \
-                      azure-enterprise-demo \
-                      -n "$(devNamespace)" \
-                      -o jsonpath='{.spec.template.spec.containers[0].image}'
-
-                    echo
-
-                    echo "===== Deploy immutable image to dev ====="
-
-                    kubectl set image \
-                      deployment/azure-enterprise-demo \
-                      application="$(acrLoginServer)/$(imageRepository):$(imageTag)" \
-                      -n "$(devNamespace)"
-
-                    echo "===== Wait for dev rollout ====="
-
-                    kubectl rollout status \
-                      deployment/azure-enterprise-demo \
-                      -n "$(devNamespace)" \
-                      --timeout=180s
-
-                    echo "===== Verify dev pods ====="
-
-                    kubectl get pods \
-                      -n "$(devNamespace)" \
-                      -l app=azure-enterprise-demo \
-                      -o wide
-
-                    echo "===== Verify dev image ====="
-
-                    kubectl get pods \
-                      -n "$(devNamespace)" \
-                      -l app=azure-enterprise-demo \
-                      -o jsonpath='{range .items[*]}{.metadata.name}{" -> "}{.spec.containers[0].image}{"\n"}{end}'
-
-                  displayName: Deploy and verify dev
-
+                - template: ../templates/deploy-aks.yml
+                  parameters:
+                    azureServiceConnection: $(azureServiceConnection)
+                    resourceGroup: $(resourceGroup)
+                    aksCluster: $(aksCluster)
+                    namespace: $(devNamespace)
+                    acrLoginServer: $(acrLoginServer)
+                    imageRepository: $(imageRepository)
+                    imageTag: $(imageTag)
+                    environmentLabel: dev
 
   - stage: DeployStaging
     displayName: Promote to staging
