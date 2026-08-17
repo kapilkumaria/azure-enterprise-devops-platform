@@ -22,7 +22,7 @@ variables:
   stagingNamespace: applications-staging
   prodNamespace: applications-prod
 
-  acrLoginServer: acraedpdevn47nuz.azurecr.io
+  acrLoginServer: acraedpdev016rlp.azurecr.io
   imageRepository: azure-enterprise-demo
 
   imageTag: $(resources.pipeline.ci.runID)
