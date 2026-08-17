@@ -5,8 +5,9 @@ trigger:
 
   paths:
     include:
-      - application/*
+      - application/**
       - pipelines/ci/application-ci.yml
+      - pipelines/templates/**
 
 pr:
   branches:
@@ -15,12 +16,9 @@ pr:
 
   paths:
     include:
-      - application/*
+      - application/**
       - pipelines/ci/application-ci.yml
-
-
-pool:
-  name: aedp-linux-pool
+      - pipelines/templates/**
 
 
 variables:
