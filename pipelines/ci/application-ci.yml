@@ -85,3 +85,24 @@ stages:
               imageTag: $(imageTag)
               dockerfilePath: $(dockerfilePath)
               buildContext: $(buildContext)
+
+  - stage: SecurityScan
+    displayName: Security scan
+    dependsOn: BuildAndPush
+    condition: succeeded()
+
+    jobs:
+
+      - job: ScanContainerImage
+        displayName: Scan immutable image with Trivy
+
+        steps:
+
+          - checkout: self
+            clean: true
+
+          - template: ../templates/trivy-image-scan.yml
+            parameters:
+              image: $(acrLoginServer)/$(imageRepository):$(imageTag)
+              severity: HIGH,CRITICAL
+              ignoreUnfixed: true

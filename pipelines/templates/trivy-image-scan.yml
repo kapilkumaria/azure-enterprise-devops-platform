@@ -1,0 +1,45 @@
+parameters:
+  - name: image
+    type: string
+
+  - name: severity
+    type: string
+    default: HIGH,CRITICAL
+
+  - name: ignoreUnfixed
+    type: boolean
+    default: true
+
+steps:
+
+  - script: |
+      set -euo pipefail
+
+      echo "===== Trivy version ====="
+      trivy --version
+
+      echo "===== Security scan target ====="
+      echo "Image: ${{ parameters.image }}"
+      echo "Severity gate: ${{ parameters.severity }}"
+      echo "Ignore unfixed: ${{ parameters.ignoreUnfixed }}"
+
+      echo "===== Run vulnerability scan ====="
+
+      EXTRA_ARGS=""
+
+      if [ "${{ parameters.ignoreUnfixed }}" = "True" ] || \
+         [ "${{ parameters.ignoreUnfixed }}" = "true" ]; then
+        EXTRA_ARGS="--ignore-unfixed"
+      fi
+
+      trivy image \
+        --scanners vuln \
+        --severity "${{ parameters.severity }}" \
+        --exit-code 1 \
+        ${EXTRA_ARGS} \
+        --no-progress \
+        "${{ parameters.image }}"
+
+      echo "===== Trivy security gate passed ====="
+
+    displayName: Trivy vulnerability scan
