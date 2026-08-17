@@ -21,6 +21,10 @@ pr:
       - pipelines/templates/**
 
 
+pool:
+  name: aedp-linux-pool
+
+
 variables:
   azureServiceConnection: sc-aedp-azure-wif
 
@@ -34,7 +38,6 @@ variables:
   dockerfilePath: $(Build.SourcesDirectory)/application/Dockerfile
 
   buildContext: $(Build.SourcesDirectory)/application
-
 
 stages:
 
