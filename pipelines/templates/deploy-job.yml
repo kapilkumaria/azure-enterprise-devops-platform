@@ -1,0 +1,58 @@
+parameters:
+  - name: deploymentName
+    type: string
+
+  - name: displayName
+    type: string
+
+  - name: environmentName
+    type: string
+
+  - name: environmentLabel
+    type: string
+
+  - name: namespace
+    type: string
+
+  - name: azureServiceConnection
+    type: string
+
+  - name: resourceGroup
+    type: string
+
+  - name: aksCluster
+    type: string
+
+  - name: acrLoginServer
+    type: string
+
+  - name: imageRepository
+    type: string
+
+  - name: imageTag
+    type: string
+
+jobs:
+
+  - deployment: ${{ parameters.deploymentName }}
+    displayName: ${{ parameters.displayName }}
+    environment: ${{ parameters.environmentName }}
+
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+            - checkout: self
+              clean: true
+
+            - template: deploy-aks.yml
+              parameters:
+                azureServiceConnection: ${{ parameters.azureServiceConnection }}
+                resourceGroup: ${{ parameters.resourceGroup }}
+                aksCluster: ${{ parameters.aksCluster }}
+                namespace: ${{ parameters.namespace }}
+                acrLoginServer: ${{ parameters.acrLoginServer }}
+                imageRepository: ${{ parameters.imageRepository }}
+                imageTag: ${{ parameters.imageTag }}
+                environmentLabel: ${{ parameters.environmentLabel }}

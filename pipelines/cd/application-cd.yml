@@ -34,28 +34,20 @@ stages:
 
     jobs:
 
-      - deployment: DeployDevApplication
-        displayName: Deploy immutable image to dev
-        environment: aedp-dev
+      - template: ../templates/deploy-job.yml
+        parameters:
+          deploymentName: DeployDevApplication
+          displayName: Deploy immutable image to dev
+          environmentName: aedp-dev
+          environmentLabel: dev
+          namespace: $(devNamespace)
+          azureServiceConnection: $(azureServiceConnection)
+          resourceGroup: $(resourceGroup)
+          aksCluster: $(aksCluster)
+          acrLoginServer: $(acrLoginServer)
+          imageRepository: $(imageRepository)
+          imageTag: $(imageTag)
 
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-
-                - checkout: self
-                  clean: true
-
-                - template: ../templates/deploy-aks.yml
-                  parameters:
-                    azureServiceConnection: $(azureServiceConnection)
-                    resourceGroup: $(resourceGroup)
-                    aksCluster: $(aksCluster)
-                    namespace: $(devNamespace)
-                    acrLoginServer: $(acrLoginServer)
-                    imageRepository: $(imageRepository)
-                    imageTag: $(imageTag)
-                    environmentLabel: dev
 
   - stage: DeployStaging
     displayName: Promote to staging
@@ -64,28 +56,19 @@ stages:
 
     jobs:
 
-      - deployment: DeployStagingApplication
-        displayName: Deploy same immutable image to staging
-        environment: aedp-staging
-
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-
-                - checkout: self
-                  clean: true
-
-                - template: ../templates/deploy-aks.yml
-                  parameters:
-                    azureServiceConnection: $(azureServiceConnection)
-                    resourceGroup: $(resourceGroup)
-                    aksCluster: $(aksCluster)
-                    namespace: $(stagingNamespace)
-                    acrLoginServer: $(acrLoginServer)
-                    imageRepository: $(imageRepository)
-                    imageTag: $(imageTag)
-                    environmentLabel: staging
+      - template: ../templates/deploy-job.yml
+        parameters:
+          deploymentName: DeployStagingApplication
+          displayName: Deploy same immutable image to staging
+          environmentName: aedp-staging
+          environmentLabel: staging
+          namespace: $(stagingNamespace)
+          azureServiceConnection: $(azureServiceConnection)
+          resourceGroup: $(resourceGroup)
+          aksCluster: $(aksCluster)
+          acrLoginServer: $(acrLoginServer)
+          imageRepository: $(imageRepository)
+          imageTag: $(imageTag)
 
 
   - stage: DeployProd
@@ -95,25 +78,16 @@ stages:
 
     jobs:
 
-      - deployment: DeployProdApplication
-        displayName: Deploy same immutable image to production
-        environment: aedp-prod
-
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-
-                - checkout: self
-                  clean: true
-
-                - template: ../templates/deploy-aks.yml
-                  parameters:
-                    azureServiceConnection: $(azureServiceConnection)
-                    resourceGroup: $(resourceGroup)
-                    aksCluster: $(aksCluster)
-                    namespace: $(prodNamespace)
-                    acrLoginServer: $(acrLoginServer)
-                    imageRepository: $(imageRepository)
-                    imageTag: $(imageTag)
-                    environmentLabel: production
+      - template: ../templates/deploy-job.yml
+        parameters:
+          deploymentName: DeployProdApplication
+          displayName: Deploy same immutable image to production
+          environmentName: aedp-prod
+          environmentLabel: production
+          namespace: $(prodNamespace)
+          azureServiceConnection: $(azureServiceConnection)
+          resourceGroup: $(resourceGroup)
+          aksCluster: $(aksCluster)
+          acrLoginServer: $(acrLoginServer)
+          imageRepository: $(imageRepository)
+          imageTag: $(imageTag)
