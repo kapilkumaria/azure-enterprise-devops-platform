@@ -107,79 +107,13 @@ stages:
                 - checkout: self
                   clean: true
 
-                - task: AzureCLI@2
-                  displayName: Authenticate to Azure and configure AKS
-                  inputs:
-                    azureSubscription: $(azureServiceConnection)
-                    scriptType: bash
-                    scriptLocation: inlineScript
-                    inlineScript: |
-                      set -euo pipefail
-
-                      echo "===== Configure AKS credentials ====="
-
-                      az aks get-credentials \
-                        --resource-group "$(resourceGroup)" \
-                        --name "$(aksCluster)" \
-                        --overwrite-existing
-
-                      kubelogin convert-kubeconfig -l azurecli
-
-                      echo "===== Verify production namespace authorization ====="
-
-                      kubectl auth can-i get deployments \
-                        -n "$(prodNamespace)"
-
-                      kubectl auth can-i patch deployments \
-                        -n "$(prodNamespace)"
-
-                      kubectl get deployment \
-                        azure-enterprise-demo \
-                        -n "$(prodNamespace)"
-
-                - script: |
-                    set -euo pipefail
-
-                    echo "===== Promote exact CI artifact to production ====="
-                    echo "CI Run ID / Image Tag: $(resources.pipeline.ci.runID)"
-                    echo "CI branch: $(resources.pipeline.ci.sourceBranch)"
-                    echo "CI commit: $(resources.pipeline.ci.sourceCommit)"
-
-                    echo "===== Current production image ====="
-
-                    kubectl get deployment \
-                      azure-enterprise-demo \
-                      -n "$(prodNamespace)" \
-                      -o jsonpath='{.spec.template.spec.containers[0].image}'
-
-                    echo
-
-                    echo "===== Deploy same immutable image to production ====="
-
-                    kubectl set image \
-                      deployment/azure-enterprise-demo \
-                      application="$(acrLoginServer)/$(imageRepository):$(imageTag)" \
-                      -n "$(prodNamespace)"
-
-                    echo "===== Wait for production rollout ====="
-
-                    kubectl rollout status \
-                      deployment/azure-enterprise-demo \
-                      -n "$(prodNamespace)" \
-                      --timeout=180s
-
-                    echo "===== Verify production pods ====="
-
-                    kubectl get pods \
-                      -n "$(prodNamespace)" \
-                      -l app=azure-enterprise-demo \
-                      -o wide
-
-                    echo "===== Verify production image ====="
-
-                    kubectl get pods \
-                      -n "$(prodNamespace)" \
-                      -l app=azure-enterprise-demo \
-                      -o jsonpath='{range .items[*]}{.metadata.name}{" -> "}{.spec.containers[0].image}{"\n"}{end}'
-
-                  displayName: Deploy and verify production
+                - template: ../templates/deploy-aks.yml
+                  parameters:
+                    azureServiceConnection: $(azureServiceConnection)
+                    resourceGroup: $(resourceGroup)
+                    aksCluster: $(aksCluster)
+                    namespace: $(prodNamespace)
+                    acrLoginServer: $(acrLoginServer)
+                    imageRepository: $(imageRepository)
+                    imageTag: $(imageTag)
+                    environmentLabel: production
