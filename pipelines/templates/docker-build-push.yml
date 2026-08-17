@@ -1,0 +1,94 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+
+  - name: acrName
+    type: string
+
+  - name: acrLoginServer
+    type: string
+
+  - name: imageRepository
+    type: string
+
+  - name: imageTag
+    type: string
+
+  - name: dockerfilePath
+    type: string
+
+  - name: buildContext
+    type: string
+
+steps:
+
+  - task: AzureCLI@2
+    displayName: Authenticate to Azure and ACR
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+
+        echo "===== Azure identity ====="
+
+        az account show \
+          --query '{
+            Subscription:name,
+            SubscriptionId:id,
+            Tenant:tenantId
+          }' \
+          -o table
+
+        echo "===== Authenticate to ACR ====="
+
+        az acr login \
+          --name "${{ parameters.acrName }}"
+
+        echo "===== ACR authentication completed ====="
+
+  - script: |
+      set -euo pipefail
+
+      IMAGE="${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:${{ parameters.imageTag }}"
+
+      echo "===== Immutable container image ====="
+      echo "Image: ${IMAGE}"
+
+      echo "===== Build container image ====="
+
+      docker build \
+        --file "${{ parameters.dockerfilePath }}" \
+        --tag "${IMAGE}" \
+        "${{ parameters.buildContext }}"
+
+      echo "===== Verify locally built image ====="
+
+      docker image inspect "${IMAGE}"
+
+      echo "===== Push exact built image to ACR ====="
+
+      docker push "${IMAGE}"
+
+      echo "===== Container build and push completed successfully ====="
+
+    displayName: Build and push immutable image
+
+  - task: AzureCLI@2
+    displayName: Verify image in ACR
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+
+        echo "===== Verify image tag in ACR ====="
+
+        az acr repository show-tags \
+          --name "${{ parameters.acrName }}" \
+          --repository "${{ parameters.imageRepository }}" \
+          --orderby time_desc \
+          --top 10 \
+          -o table

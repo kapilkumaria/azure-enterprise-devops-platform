@@ -60,83 +60,27 @@ stages:
               virtualEnvironment: .venv
 
 
-  - stage: Build
-    displayName: Build container
+  - stage: BuildAndPush
+    displayName: Build and push container
     dependsOn: Validate
+    condition: succeeded()
 
     jobs:
 
-      - job: BuildContainer
-        displayName: Build Docker image
+      - job: BuildAndPushContainer
+        displayName: Build and push immutable image
 
         steps:
 
           - checkout: self
             clean: true
 
-          - template: ../templates/docker-build.yml
+          - template: ../templates/docker-build-push.yml
             parameters:
-              dockerfilePath: $(dockerfilePath)
-              buildContext: $(buildContext)
+              azureServiceConnection: $(azureServiceConnection)
+              acrName: $(acrName)
               acrLoginServer: $(acrLoginServer)
               imageRepository: $(imageRepository)
               imageTag: $(imageTag)
-
-
-  - stage: Push
-    displayName: Push image to ACR
-    dependsOn: Build
-
-    jobs:
-
-      - job: PushContainer
-        displayName: Authenticate and push image
-
-        steps:
-
-          - checkout: self
-            clean: true
-
-          - task: AzureCLI@2
-            displayName: Authenticate to Azure and ACR
-            inputs:
-              azureSubscription: $(azureServiceConnection)
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                echo "Azure authentication succeeded"
-
-                az account show \
-                  --query '{
-                    Subscription:name,
-                    SubscriptionId:id,
-                    Tenant:tenantId
-                  }' \
-                  -o table
-
-                az acr login \
-                  --name "$(acrName)"
-
-          - script: |
-              docker build \
-                --file "$(dockerfilePath)" \
-                --tag "$(acrLoginServer)/$(imageRepository):$(imageTag)" \
-                "$(buildContext)"
-
-              docker push \
-                "$(acrLoginServer)/$(imageRepository):$(imageTag)"
-            displayName: Build and push immutable image
-
-          - task: AzureCLI@2
-            displayName: Verify image in ACR
-            inputs:
-              azureSubscription: $(azureServiceConnection)
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                az acr repository show-tags \
-                  --name "$(acrName)" \
-                  --repository "$(imageRepository)" \
-                  --orderby time_desc \
-                  --top 10 \
-                  -o table
+              dockerfilePath: $(dockerfilePath)
+              buildContext: $(buildContext)
