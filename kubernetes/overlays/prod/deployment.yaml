@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-enterprise-demo
+  namespace: applications-prod
+  labels:
+    app: azure-enterprise-demo
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: azure-enterprise-demo
+
+  template:
+    metadata:
+      labels:
+        app: azure-enterprise-demo
+        azure.workload.identity/use: "true"
+
+    spec:
+      serviceAccountName: workload-identity-sa
+
+      nodeSelector:
+        workload: applications
+
+      containers:
+        - name: application
+          image: acraedpdevn47nuz.azurecr.io/azure-enterprise-demo:49
+
+          ports:
+            - name: http
+              containerPort: 8080
+
+          env:
+            - name: ENVIRONMENT
+              value: prod
+
+            - name: DEMO_MESSAGE
+              valueFrom:
+                secretKeyRef:
+                  name: demo-keyvault-secret
+                  key: demo-message
+
+          volumeMounts:
+            - name: secrets-store-inline
+              mountPath: /mnt/secrets-store
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            capabilities:
+              drop:
+                - ALL
+
+      volumes:
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-keyvault-workload
