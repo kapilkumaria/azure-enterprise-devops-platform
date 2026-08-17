@@ -53,29 +53,11 @@ stages:
           - checkout: self
             clean: true
 
-          - script: |
-              set -euo pipefail
-
-              echo "===== Python ====="
-              python3 --version
-
-              echo "===== Create virtual environment ====="
-              python3 -m venv .venv
-
-              source .venv/bin/activate
-
-              echo "===== pip ====="
-              python -m pip --version
-              python -m pip install --upgrade pip
-
-              echo "===== Install dependencies ====="
-              python -m pip install \
-                -r application/requirements.txt
-
-              echo "===== Validate source ====="
-              python -m compileall application/src
-
-            displayName: Validate Python application
+          - template: ../templates/python-validate.yml
+            parameters:
+              requirementsFile: application/requirements.txt
+              sourceDirectory: application/src
+              virtualEnvironment: .venv
 
 
   - stage: Build

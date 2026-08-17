@@ -1,0 +1,43 @@
+parameters:
+  - name: requirementsFile
+    type: string
+
+  - name: sourceDirectory
+    type: string
+
+  - name: virtualEnvironment
+    type: string
+    default: .venv
+
+steps:
+
+  - script: |
+      set -euo pipefail
+
+      echo "===== Python runtime ====="
+      python3 --version
+
+      echo "===== Create virtual environment ====="
+      python3 -m venv "${{ parameters.virtualEnvironment }}"
+
+      echo "===== Activate virtual environment ====="
+      source "${{ parameters.virtualEnvironment }}/bin/activate"
+
+      echo "===== pip ====="
+      python -m pip --version
+
+      echo "===== Upgrade pip ====="
+      python -m pip install \
+        --upgrade pip
+
+      echo "===== Install application dependencies ====="
+      python -m pip install \
+        -r "${{ parameters.requirementsFile }}"
+
+      echo "===== Validate Python source ====="
+      python -m compileall \
+        "${{ parameters.sourceDirectory }}"
+
+      echo "===== Python validation completed successfully ====="
+
+    displayName: Validate Python application
