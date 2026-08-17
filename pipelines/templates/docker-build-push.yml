@@ -59,6 +59,7 @@ steps:
       echo "===== Build container image ====="
 
       docker build \
+        --pull \
         --file "${{ parameters.dockerfilePath }}" \
         --tag "${IMAGE}" \
         "${{ parameters.buildContext }}"
