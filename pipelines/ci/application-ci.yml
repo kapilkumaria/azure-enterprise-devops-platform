@@ -74,17 +74,13 @@ stages:
           - checkout: self
             clean: true
 
-          - script: |
-              docker build \
-                --file "$(dockerfilePath)" \
-                --tag "$(acrLoginServer)/$(imageRepository):$(imageTag)" \
-                "$(buildContext)"
-            displayName: Build application image
-
-          - script: |
-              docker image inspect \
-                "$(acrLoginServer)/$(imageRepository):$(imageTag)"
-            displayName: Verify image
+          - template: ../templates/docker-build.yml
+            parameters:
+              dockerfilePath: $(dockerfilePath)
+              buildContext: $(buildContext)
+              acrLoginServer: $(acrLoginServer)
+              imageRepository: $(imageRepository)
+              imageTag: $(imageTag)
 
 
   - stage: Push

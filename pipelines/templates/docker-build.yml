@@ -1,0 +1,40 @@
+parameters:
+  - name: dockerfilePath
+    type: string
+
+  - name: buildContext
+    type: string
+
+  - name: acrLoginServer
+    type: string
+
+  - name: imageRepository
+    type: string
+
+  - name: imageTag
+    type: string
+
+steps:
+
+  - script: |
+      set -euo pipefail
+
+      IMAGE="${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:${{ parameters.imageTag }}"
+
+      echo "===== Container build ====="
+      echo "Dockerfile: ${{ parameters.dockerfilePath }}"
+      echo "Build context: ${{ parameters.buildContext }}"
+      echo "Image: ${IMAGE}"
+
+      docker build \
+        --file "${{ parameters.dockerfilePath }}" \
+        --tag "${IMAGE}" \
+        "${{ parameters.buildContext }}"
+
+      echo "===== Verify built image ====="
+
+      docker image inspect "${IMAGE}"
+
+      echo "===== Docker build completed successfully ====="
+
+    displayName: Build and verify Docker image
