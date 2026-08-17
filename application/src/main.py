@@ -9,7 +9,7 @@ app = FastAPI(
 @app.get("/")
 def root():
     return {
-        "message": "Azure Enterprise DevOps Platform - Reusable Dev and Staging Templates",
+        "message": "Azure Enterprise DevOps Platform - Fully Templated CD",
         "environment": os.getenv("ENVIRONMENT", "unknown")
     }
 
