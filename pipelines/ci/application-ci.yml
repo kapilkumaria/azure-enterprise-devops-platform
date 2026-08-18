@@ -36,8 +36,8 @@ variables:
   imageTag: $(Build.BuildId)
 
   dockerfilePath: $(Build.SourcesDirectory)/application/Dockerfile
-
   buildContext: $(Build.SourcesDirectory)/application
+
 
 stages:
 
@@ -60,6 +60,7 @@ stages:
               sourceDirectory: application/src
               virtualEnvironment: .venv
 
+
   - stage: SourceSecurityScan
     displayName: Source security scan
     dependsOn: Validate
@@ -79,6 +80,7 @@ stages:
             parameters:
               scanPath: .
               severity: HIGH,CRITICAL
+
 
   - stage: BuildAndPush
     displayName: Build and push container
@@ -105,6 +107,7 @@ stages:
               dockerfilePath: $(dockerfilePath)
               buildContext: $(buildContext)
 
+
   - stage: SecurityScan
     displayName: Security scan
     dependsOn: BuildAndPush
@@ -120,8 +123,32 @@ stages:
           - checkout: self
             clean: true
 
+          - download: current
+            artifact: image-metadata
+
+          - script: |
+              set -euo pipefail
+
+              DIGEST_FILE="$(Pipeline.Workspace)/image-metadata/image-digest.txt"
+
+              echo "===== Load immutable image digest ====="
+              echo "Digest file: ${DIGEST_FILE}"
+
+              DIGEST="$(tr -d '\r\n' < "${DIGEST_FILE}")"
+
+              if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                echo "ERROR: Invalid image digest: ${DIGEST}"
+                exit 1
+              fi
+
+              echo "Digest: ${DIGEST}"
+
+              echo "##vso[task.setvariable variable=imageDigest]${DIGEST}"
+
+            displayName: Load immutable image digest
+
           - template: ../templates/trivy-image-scan.yml
             parameters:
-              image: $(acrLoginServer)/$(imageRepository):$(imageTag)
+              image: $(acrLoginServer)/$(imageRepository)@$(imageDigest)
               severity: HIGH,CRITICAL
               ignoreUnfixed: true

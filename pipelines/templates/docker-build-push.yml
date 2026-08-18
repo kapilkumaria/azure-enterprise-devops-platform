@@ -20,6 +20,10 @@ parameters:
   - name: buildContext
     type: string
 
+  - name: metadataDirectory
+    type: string
+    default: $(Build.ArtifactStagingDirectory)/image-metadata
+
 steps:
 
   - task: AzureCLI@2
@@ -77,7 +81,7 @@ steps:
     displayName: Build and push immutable image
 
   - task: AzureCLI@2
-    displayName: Verify image in ACR
+    displayName: Resolve immutable image digest
     inputs:
       azureSubscription: ${{ parameters.azureServiceConnection }}
       scriptType: bash
@@ -85,7 +89,63 @@ steps:
       inlineScript: |
         set -euo pipefail
 
-        echo "===== Verify image tag in ACR ====="
+        echo "===== Resolve ACR manifest digest ====="
+
+        DIGEST="$(
+          az acr repository show \
+            --name "${{ parameters.acrName }}" \
+            --image "${{ parameters.imageRepository }}:${{ parameters.imageTag }}" \
+            --query digest \
+            -o tsv
+        )"
+
+        echo "Digest: ${DIGEST}"
+
+        if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+          echo "ERROR: Invalid image digest returned by ACR: ${DIGEST}"
+          exit 1
+        fi
+
+        METADATA_DIR="${{ parameters.metadataDirectory }}"
+
+        mkdir -p "${METADATA_DIR}"
+
+        printf '%s\n' "${DIGEST}" \
+          > "${METADATA_DIR}/image-digest.txt"
+
+        cat > "${METADATA_DIR}/image-metadata.json" <<EOF
+        {
+          "registry": "${{ parameters.acrLoginServer }}",
+          "repository": "${{ parameters.imageRepository }}",
+          "tag": "${{ parameters.imageTag }}",
+          "digest": "${DIGEST}",
+          "tagReference": "${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:${{ parameters.imageTag }}",
+          "digestReference": "${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}@${DIGEST}",
+          "buildId": "$(Build.BuildId)",
+          "sourceBranch": "$(Build.SourceBranch)",
+          "sourceCommit": "$(Build.SourceVersion)"
+        }
+        EOF
+
+        echo "===== Image metadata ====="
+
+        cat "${METADATA_DIR}/image-metadata.json"
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish immutable image metadata
+    inputs:
+      targetPath: ${{ parameters.metadataDirectory }}
+      artifact: image-metadata
+      publishLocation: pipeline
+
+  - task: AzureCLI@2
+    displayName: Verify image in ACR
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
 
         az acr repository show-tags \
           --name "${{ parameters.acrName }}" \

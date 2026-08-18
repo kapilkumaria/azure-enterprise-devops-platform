@@ -17,7 +17,7 @@ parameters:
   - name: imageRepository
     type: string
 
-  - name: imageTag
+  - name: imageDigestFile
     type: string
 
   - name: environmentLabel
@@ -68,12 +68,27 @@ steps:
   - script: |
       set -euo pipefail
 
+      DIGEST_FILE="${{ parameters.imageDigestFile }}"
+
       echo "===== Deployment target ====="
       echo "Environment: ${{ parameters.environmentLabel }}"
       echo "Namespace: ${{ parameters.namespace }}"
 
+      echo "===== Load immutable digest ====="
+      echo "Digest file: ${DIGEST_FILE}"
+
+      DIGEST="$(tr -d '\r\n' < "${DIGEST_FILE}")"
+
+      if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+        echo "ERROR: Invalid image digest: ${DIGEST}"
+        exit 1
+      fi
+
+      IMAGE="${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}@${DIGEST}"
+
       echo "===== Immutable artifact ====="
-      echo "Image: ${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:${{ parameters.imageTag }}"
+      echo "Digest: ${DIGEST}"
+      echo "Image: ${IMAGE}"
 
       echo "===== Current image ====="
 
@@ -84,11 +99,11 @@ steps:
 
       echo
 
-      echo "===== Deploy immutable image ====="
+      echo "===== Deploy image by immutable digest ====="
 
       kubectl set image \
         deployment/azure-enterprise-demo \
-        application="${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}:${{ parameters.imageTag }}" \
+        application="${IMAGE}" \
         -n "${{ parameters.namespace }}"
 
       echo "===== Wait for rollout ====="
@@ -105,11 +120,22 @@ steps:
         -l app=azure-enterprise-demo \
         -o wide
 
-      echo "===== Running image ====="
+      echo "===== Deployment image ====="
+
+      kubectl get deployment \
+        azure-enterprise-demo \
+        -n "${{ parameters.namespace }}" \
+        -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+      echo
+
+      echo "===== Runtime image IDs ====="
 
       kubectl get pods \
         -n "${{ parameters.namespace }}" \
         -l app=azure-enterprise-demo \
-        -o jsonpath='{range .items[*]}{.metadata.name}{" -> "}{.spec.containers[0].image}{"\n"}{end}'
+        -o jsonpath='{range .items[*]}{.metadata.name}{" -> "}{.status.containerStatuses[0].imageID}{"\n"}{end}'
+
+      echo "===== Digest deployment verified ====="
 
     displayName: Deploy and verify ${{ parameters.environmentLabel }}

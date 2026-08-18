@@ -29,9 +29,6 @@ parameters:
   - name: imageRepository
     type: string
 
-  - name: imageTag
-    type: string
-
 jobs:
 
   - deployment: ${{ parameters.deploymentName }}
@@ -43,8 +40,23 @@ jobs:
         deploy:
           steps:
 
+            - download: none
+
             - checkout: self
               clean: true
+
+            - download: ci
+              artifact: image-metadata
+
+            - script: |
+                set -euo pipefail
+
+                echo "===== CI immutable image metadata ====="
+
+                cat \
+                  "$(Pipeline.Workspace)/ci/image-metadata/image-metadata.json"
+
+              displayName: Verify CI image metadata
 
             - template: deploy-aks.yml
               parameters:
@@ -54,5 +66,5 @@ jobs:
                 namespace: ${{ parameters.namespace }}
                 acrLoginServer: ${{ parameters.acrLoginServer }}
                 imageRepository: ${{ parameters.imageRepository }}
-                imageTag: ${{ parameters.imageTag }}
+                imageDigestFile: $(Pipeline.Workspace)/ci/image-metadata/image-digest.txt
                 environmentLabel: ${{ parameters.environmentLabel }}
