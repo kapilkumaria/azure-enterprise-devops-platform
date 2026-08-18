@@ -8,6 +8,7 @@ trigger:
       - application/**
       - pipelines/ci/application-ci.yml
       - pipelines/templates/**
+      - .pipeline/**
 
 pr:
   branches:
@@ -19,6 +20,7 @@ pr:
       - application/**
       - pipelines/ci/application-ci.yml
       - pipelines/templates/**
+      - .pipeline/**
 
 
 pool:
