@@ -1,0 +1,59 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+
+  - name: acrName
+    type: string
+
+  - name: acrLoginServer
+    type: string
+
+  - name: imageRepository
+    type: string
+
+  - name: imageDigest
+    type: string
+
+  - name: trustPolicy
+    type: string
+    default: .pipeline/trustpolicy/trustpolicy.json
+
+  - name: trustStore
+    type: string
+    default: .pipeline/truststore/
+
+steps:
+
+  - task: AzureCLI@2
+    displayName: Authenticate to Azure and ACR for verification
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+
+        echo "===== Azure identity ====="
+
+        az account show \
+          --query '{
+            Subscription:name,
+            SubscriptionId:id,
+            Tenant:tenantId
+          }' \
+          -o table
+
+        echo "===== Authenticate to ACR ====="
+
+        az acr login \
+          --name "${{ parameters.acrName }}"
+
+        echo "===== ACR authentication completed ====="
+
+  - task: Notation@0
+    displayName: Verify trusted immutable image
+    inputs:
+      command: verify
+      artifactRefs: '${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}@${{ parameters.imageDigest }}'
+      trustPolicy: ${{ parameters.trustPolicy }}
+      trustStore: ${{ parameters.trustStore }}

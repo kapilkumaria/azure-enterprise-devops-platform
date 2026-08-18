@@ -9,8 +9,10 @@ resources:
           include:
             - main
 
+
 pool:
   name: aedp-linux-pool
+
 
 variables:
   azureServiceConnection: sc-aedp-azure-wif
@@ -22,21 +24,92 @@ variables:
   stagingNamespace: applications-staging
   prodNamespace: applications-prod
 
+  acrName: acraedpdevj30iq9
   acrLoginServer: acraedpdevj30iq9.azurecr.io
   imageRepository: azure-enterprise-demo
 
 
 stages:
 
+  - stage: VerifyArtifact
+    displayName: Verify signed artifact before deployment
+
+    jobs:
+
+      - job: VerifySignedImage
+        displayName: Verify immutable image signature with Notation
+
+        steps:
+
+          - download: none
+
+          - checkout: self
+            clean: true
+
+          - download: ci
+            artifact: image-metadata
+
+          - script: |
+              set -euo pipefail
+
+              METADATA_FILE="$(Pipeline.Workspace)/ci/image-metadata/image-metadata.json"
+              DIGEST_FILE="$(Pipeline.Workspace)/ci/image-metadata/image-digest.txt"
+
+              echo "===== CI immutable image metadata ====="
+
+              if [ ! -f "${METADATA_FILE}" ]; then
+                echo "ERROR: CI image metadata file does not exist:"
+                echo "${METADATA_FILE}"
+                exit 1
+              fi
+
+              if [ ! -f "${DIGEST_FILE}" ]; then
+                echo "ERROR: CI image digest file does not exist:"
+                echo "${DIGEST_FILE}"
+                exit 1
+              fi
+
+              cat "${METADATA_FILE}"
+
+              echo
+              echo "===== Load immutable image digest ====="
+
+              DIGEST="$(tr -d '\r\n' < "${DIGEST_FILE}")"
+
+              if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                echo "ERROR: Invalid image digest: ${DIGEST}"
+                exit 1
+              fi
+
+              IMAGE="$(acrLoginServer)/$(imageRepository)@${DIGEST}"
+
+              echo "Digest: ${DIGEST}"
+              echo "Image: ${IMAGE}"
+
+              echo "##vso[task.setvariable variable=imageDigest]${DIGEST}"
+
+            displayName: Validate CI image metadata and digest
+
+          - template: ../templates/notation-verify.yml
+            parameters:
+              azureServiceConnection: $(azureServiceConnection)
+              acrName: $(acrName)
+              acrLoginServer: $(acrLoginServer)
+              imageRepository: $(imageRepository)
+              imageDigest: $(imageDigest)
+
+
   - stage: DeployDev
     displayName: Deploy to dev
+    dependsOn: VerifyArtifact
+    condition: succeeded()
 
     jobs:
 
       - template: ../templates/deploy-job.yml
         parameters:
           deploymentName: DeployDevApplication
-          displayName: Deploy immutable digest to dev
+          displayName: Deploy verified immutable digest to dev
           environmentName: aedp-dev
           environmentLabel: dev
           namespace: $(devNamespace)
@@ -57,7 +130,7 @@ stages:
       - template: ../templates/deploy-job.yml
         parameters:
           deploymentName: DeployStagingApplication
-          displayName: Promote same immutable digest to staging
+          displayName: Promote verified immutable digest to staging
           environmentName: aedp-staging
           environmentLabel: staging
           namespace: $(stagingNamespace)
@@ -78,7 +151,7 @@ stages:
       - template: ../templates/deploy-job.yml
         parameters:
           deploymentName: DeployProdApplication
-          displayName: Promote same immutable digest to production
+          displayName: Promote verified immutable digest to production
           environmentName: aedp-prod
           environmentLabel: production
           namespace: $(prodNamespace)
