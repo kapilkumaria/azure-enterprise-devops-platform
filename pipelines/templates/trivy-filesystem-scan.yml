@@ -40,6 +40,21 @@ steps:
         --output "${{ parameters.reportDirectory }}/trivy-source.json" \
         "${{ parameters.scanPath }}"
 
+      echo "===== Generate SARIF report ====="
+
+      trivy fs \
+        --scanners vuln,misconfig,secret \
+        --severity "${{ parameters.severity }}" \
+        --ignore-unfixed \
+        --skip-files "**/*.tfstate" \
+        --skip-files "**/*.tfstate.*" \
+        --skip-files "**/*.tfplan" \
+        --skip-files "**/*.tfplan.*" \
+        --skip-dirs "**/.terraform" \
+        --format sarif \
+        --output "${{ parameters.reportDirectory }}/trivy-source.sarif" \
+        "${{ parameters.scanPath }}"
+
       echo "===== Enforce filesystem security gate ====="
 
       trivy fs \

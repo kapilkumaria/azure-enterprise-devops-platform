@@ -46,6 +46,16 @@ steps:
         --output "${{ parameters.reportDirectory }}/trivy-image.json" \
         "${{ parameters.image }}"
 
+      echo "===== Generate SARIF image report ====="
+
+      trivy image \
+        --scanners vuln \
+        --severity "${{ parameters.severity }}" \
+        ${EXTRA_ARGS} \
+        --format sarif \
+        --output "${{ parameters.reportDirectory }}/trivy-image.sarif" \
+        "${{ parameters.image }}"
+
       echo "===== Enforce image vulnerability gate ====="
 
       trivy image \
