@@ -56,6 +56,13 @@ steps:
         --output "${{ parameters.reportDirectory }}/trivy-image.sarif" \
         "${{ parameters.image }}"
 
+      echo "===== Generate CycloneDX SBOM ====="
+
+      trivy image \
+        --format cyclonedx \
+        --output "${{ parameters.reportDirectory }}/trivy-image.cdx.json" \
+        "${{ parameters.image }}"
+
       echo "===== Enforce image vulnerability gate ====="
 
       trivy image \
