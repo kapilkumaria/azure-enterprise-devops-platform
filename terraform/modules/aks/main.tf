@@ -93,7 +93,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "user" {
   }
 
   upgrade_settings {
-    max_surge = "33%"
+    max_unavailable = 1
   }
 
   tags = var.tags

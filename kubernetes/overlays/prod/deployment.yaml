@@ -35,7 +35,7 @@ spec:
 
       containers:
         - name: application
-          image: acraedpdev016rlp.azurecr.io/azure-enterprise-demo:1.0.0
+          image: acraedpdevj30iq9.azurecr.io/azure-enterprise-demo:1.0.0
 
           ports:
             - name: http

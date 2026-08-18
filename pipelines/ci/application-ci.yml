@@ -28,8 +28,8 @@ pool:
 variables:
   azureServiceConnection: sc-aedp-azure-wif
 
-  acrName: acraedpdev016rlp
-  acrLoginServer: acraedpdev016rlp.azurecr.io
+  acrName: acraedpdevj30iq9
+  acrLoginServer: acraedpdevj30iq9.azurecr.io
 
   imageRepository: azure-enterprise-demo
 
