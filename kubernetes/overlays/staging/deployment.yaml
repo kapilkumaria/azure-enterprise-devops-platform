@@ -5,6 +5,7 @@ metadata:
   namespace: applications-staging
   labels:
     app: azure-enterprise-demo
+
 spec:
   replicas: 2
 
@@ -20,6 +21,14 @@ spec:
 
     spec:
       serviceAccountName: workload-identity-sa
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
 
       nodeSelector:
         workload: applications
@@ -70,7 +79,9 @@ spec:
             periodSeconds: 20
 
           securityContext:
+            privileged: false
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             runAsNonRoot: true
             runAsUser: 10001
             runAsGroup: 10001

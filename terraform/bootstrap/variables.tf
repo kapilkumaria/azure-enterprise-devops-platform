@@ -26,3 +26,8 @@ variable "owner" {
   type        = string
   default     = "kapil"
 }
+
+variable "admin_public_ip" {
+  description = "Public IPv4 address allowed to access the Terraform backend storage account."
+  type        = string
+}

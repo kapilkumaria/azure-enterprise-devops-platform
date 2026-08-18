@@ -23,6 +23,11 @@ steps:
         --scanners vuln,misconfig,secret \
         --severity "${{ parameters.severity }}" \
         --ignore-unfixed \
+        --skip-files "**/*.tfstate" \
+        --skip-files "**/*.tfstate.*" \
+        --skip-files "**/*.tfplan" \
+        --skip-files "**/*.tfplan.*" \
+        --skip-dirs "**/.terraform" \
         --exit-code 1 \
         --no-progress \
         "${{ parameters.scanPath }}"

@@ -27,6 +27,18 @@ resource "azurerm_storage_account" "terraform_state" {
 
   allow_nested_items_to_be_public = false
 
+  network_rules {
+    default_action = "Deny"
+
+    ip_rules = [
+      var.admin_public_ip
+    ]
+
+    bypass = [
+      "AzureServices"
+    ]
+  }
+
   blob_properties {
     versioning_enabled = true
 
