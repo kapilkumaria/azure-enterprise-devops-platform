@@ -152,3 +152,51 @@ stages:
               image: $(acrLoginServer)/$(imageRepository)@$(imageDigest)
               severity: HIGH,CRITICAL
               ignoreUnfixed: true
+
+
+  - stage: SignAndVerify
+    displayName: Sign and verify immutable image
+    dependsOn: SecurityScan
+    condition: succeeded()
+
+    jobs:
+
+      - job: SignAndVerifyImage
+        displayName: Sign and verify image with Notation
+
+        steps:
+
+          - checkout: self
+            clean: true
+
+          - download: current
+            artifact: image-metadata
+
+          - script: |
+              set -euo pipefail
+
+              DIGEST_FILE="$(Pipeline.Workspace)/image-metadata/image-digest.txt"
+
+              echo "===== Load immutable image digest ====="
+
+              DIGEST="$(tr -d '\r\n' < "${DIGEST_FILE}")"
+
+              if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                echo "ERROR: Invalid image digest: ${DIGEST}"
+                exit 1
+              fi
+
+              echo "Digest: ${DIGEST}"
+
+              echo "##vso[task.setvariable variable=imageDigest]${DIGEST}"
+
+            displayName: Load immutable image digest
+
+          - template: ../templates/notation-sign-verify.yml
+            parameters:
+              azureServiceConnection: $(azureServiceConnection)
+              acrName: $(acrName)
+              acrLoginServer: $(acrLoginServer)
+              imageRepository: $(imageRepository)
+              imageDigest: $(imageDigest)
+              signingKeyId: https://kv-aedp-dev-04g3hx.vault.azure.net/keys/aedp-container-signing/d9cab4d5da154a78b79240eaad026ae0

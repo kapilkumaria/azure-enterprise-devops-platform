@@ -1,0 +1,77 @@
+parameters:
+  - name: azureServiceConnection
+    type: string
+
+  - name: acrName
+    type: string
+
+  - name: acrLoginServer
+    type: string
+
+  - name: imageRepository
+    type: string
+
+  - name: imageDigest
+    type: string
+
+  - name: signingKeyId
+    type: string
+
+  - name: trustPolicy
+    type: string
+    default: .pipeline/trustpolicy/trustpolicy.json
+
+  - name: trustStore
+    type: string
+    default: .pipeline/truststore/
+
+steps:
+
+  - task: Notation@0
+    displayName: Install Notation
+    inputs:
+      command: install
+      version: '1.3.2'
+
+  - task: AzureCLI@2
+    displayName: Authenticate to Azure and ACR for signing
+    inputs:
+      azureSubscription: ${{ parameters.azureServiceConnection }}
+      scriptType: bash
+      scriptLocation: inlineScript
+      inlineScript: |
+        set -euo pipefail
+
+        echo "===== Azure identity ====="
+
+        az account show \
+          --query '{
+            Subscription:name,
+            SubscriptionId:id,
+            Tenant:tenantId
+          }' \
+          -o table
+
+        echo "===== Authenticate to ACR ====="
+
+        az acr login \
+          --name "${{ parameters.acrName }}"
+
+  - task: Notation@0
+    displayName: Sign immutable image digest
+    inputs:
+      command: sign
+      artifactRefs: '${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}@${{ parameters.imageDigest }}'
+      plugin: azureKeyVault
+      akvPluginVersion: '1.2.1'
+      azurekvServiceConection: ${{ parameters.azureServiceConnection }}
+      keyid: ${{ parameters.signingKeyId }}
+      selfSigned: true
+
+  - task: Notation@0
+    displayName: Verify immutable image signature
+    inputs:
+      command: verify
+      artifactRefs: '${{ parameters.acrLoginServer }}/${{ parameters.imageRepository }}@${{ parameters.imageDigest }}'
+      trustPolicy: ${{ parameters.trustPolicy }}
+      trustStore: ${{ parameters.trustStore }}

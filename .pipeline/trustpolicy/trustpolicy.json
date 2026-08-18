@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "trustPolicies": [
+    {
+      "name": "aedp-container-images",
+      "registryScopes": [
+        "acraedpdevj30iq9.azurecr.io/azure-enterprise-demo"
+      ],
+      "signatureVerification": {
+        "level": "strict"
+      },
+      "trustStores": [
+        "ca:aedp"
+      ],
+      "trustedIdentities": [
+        "*"
+      ]
+    }
+  ]
+}
