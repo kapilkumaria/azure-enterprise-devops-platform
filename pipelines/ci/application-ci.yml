@@ -60,10 +60,29 @@ stages:
               sourceDirectory: application/src
               virtualEnvironment: .venv
 
+  - stage: SourceSecurityScan
+    displayName: Source security scan
+    dependsOn: Validate
+    condition: succeeded()
+
+    jobs:
+
+      - job: ScanRepository
+        displayName: Scan repository with Trivy
+
+        steps:
+
+          - checkout: self
+            clean: true
+
+          - template: ../templates/trivy-filesystem-scan.yml
+            parameters:
+              scanPath: .
+              severity: HIGH,CRITICAL
 
   - stage: BuildAndPush
     displayName: Build and push container
-    dependsOn: Validate
+    dependsOn: SourceSecurityScan
     condition: succeeded()
 
     jobs:

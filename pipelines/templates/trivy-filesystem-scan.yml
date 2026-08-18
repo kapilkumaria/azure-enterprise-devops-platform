@@ -1,0 +1,32 @@
+parameters:
+  - name: scanPath
+    type: string
+    default: .
+
+  - name: severity
+    type: string
+    default: HIGH,CRITICAL
+
+steps:
+
+  - script: |
+      set -euo pipefail
+
+      echo "===== Trivy version ====="
+      trivy --version
+
+      echo "===== Filesystem security scan ====="
+      echo "Path: ${{ parameters.scanPath }}"
+      echo "Severity gate: ${{ parameters.severity }}"
+
+      trivy fs \
+        --scanners vuln,misconfig,secret \
+        --severity "${{ parameters.severity }}" \
+        --ignore-unfixed \
+        --exit-code 1 \
+        --no-progress \
+        "${{ parameters.scanPath }}"
+
+      echo "===== Filesystem security gate passed ====="
+
+    displayName: Trivy filesystem security scan
