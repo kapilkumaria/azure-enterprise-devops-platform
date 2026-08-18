@@ -10,6 +10,10 @@ parameters:
     type: boolean
     default: true
 
+  - name: reportDirectory
+    type: string
+    default: $(Build.ArtifactStagingDirectory)/trivy-image
+
 steps:
 
   - script: |
@@ -23,7 +27,7 @@ steps:
       echo "Severity gate: ${{ parameters.severity }}"
       echo "Ignore unfixed: ${{ parameters.ignoreUnfixed }}"
 
-      echo "===== Run vulnerability scan ====="
+      mkdir -p "${{ parameters.reportDirectory }}"
 
       EXTRA_ARGS=""
 
@@ -31,6 +35,18 @@ steps:
          [ "${{ parameters.ignoreUnfixed }}" = "true" ]; then
         EXTRA_ARGS="--ignore-unfixed"
       fi
+
+      echo "===== Generate JSON image report ====="
+
+      trivy image \
+        --scanners vuln \
+        --severity "${{ parameters.severity }}" \
+        ${EXTRA_ARGS} \
+        --format json \
+        --output "${{ parameters.reportDirectory }}/trivy-image.json" \
+        "${{ parameters.image }}"
+
+      echo "===== Enforce image vulnerability gate ====="
 
       trivy image \
         --scanners vuln \
@@ -43,3 +59,11 @@ steps:
       echo "===== Trivy security gate passed ====="
 
     displayName: Trivy vulnerability scan
+
+  - task: PublishPipelineArtifact@1
+    displayName: Publish Trivy image security report
+    condition: always()
+    inputs:
+      targetPath: ${{ parameters.reportDirectory }}
+      artifact: trivy-image-report
+      publishLocation: pipeline
