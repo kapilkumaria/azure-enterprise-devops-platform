@@ -74,7 +74,8 @@ module "aks" {
 
   aks_subnet_id = module.networking.aks_subnet_id
 
-  control_plane_identity_id = module.identity.aks_control_plane_identity_id
+  control_plane_identity_id  = module.identity.aks_control_plane_identity_id
+  log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
 
   node_vm_size = "Standard_D4s_v6"
 
@@ -186,4 +187,18 @@ resource "azurerm_role_assignment" "workload_key_vault_secrets_user" {
   role_definition_name = "Key Vault Secrets User"
 
   principal_id = module.identity.workload_principal_id
+}
+
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  resource_group_name = azurerm_resource_group.platform.name
+  location            = azurerm_resource_group.platform.location
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  aks_resource_id = module.aks.id
+
+  tags = local.common_tags
 }

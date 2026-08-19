@@ -107,3 +107,14 @@ output "key_vault_uri" {
   description = "Azure Key Vault URI."
   value       = module.key_vault.vault_uri
 }
+
+
+output "log_analytics_workspace_id" {
+  description = "Log Analytics Workspace resource ID."
+  value       = module.monitoring.log_analytics_workspace_id
+}
+
+output "log_analytics_workspace_name" {
+  description = "Log Analytics Workspace name."
+  value       = module.monitoring.log_analytics_workspace_name
+}

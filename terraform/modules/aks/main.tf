@@ -8,6 +8,11 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   sku_tier = "Free"
 
+  oms_agent {
+    log_analytics_workspace_id      = var.log_analytics_workspace_id
+    msi_auth_for_monitoring_enabled = true
+  }
+
   node_provisioning_profile {
     mode = "Manual"
   }

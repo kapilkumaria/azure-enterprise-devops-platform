@@ -121,3 +121,9 @@ variable "tenant_id" {
   description = "Microsoft Entra tenant ID used for AKS authentication."
   type        = string
 }
+
+variable "log_analytics_workspace_id" {
+  description = "Log Analytics Workspace ID used by AKS Container Insights."
+  type        = string
+  default     = null
+}
