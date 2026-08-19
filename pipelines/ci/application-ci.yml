@@ -30,8 +30,8 @@ pool:
 variables:
   azureServiceConnection: sc-aedp-azure-wif
 
-  acrName: acraedpdevj30iq9
-  acrLoginServer: acraedpdevj30iq9.azurecr.io
+  acrName: acraedpdev5f4sdu
+  acrLoginServer: acraedpdev5f4sdu.azurecr.io
 
   imageRepository: azure-enterprise-demo
 
@@ -201,4 +201,4 @@ stages:
               acrLoginServer: $(acrLoginServer)
               imageRepository: $(imageRepository)
               imageDigest: $(imageDigest)
-              signingKeyId: https://kv-aedp-dev-04g3hx.vault.azure.net/keys/aedp-container-signing/79c28285f5724e90aaa635eecae92ec7
+              signingKeyId: https://kv-aedp-dev-o4d626.vault.azure.net/keys/aedp-container-signing/4be9dce61b444b2ea4c7bd29605e9f03

@@ -4,7 +4,7 @@
     {
       "name": "aedp-container-images",
       "registryScopes": [
-        "acraedpdevj30iq9.azurecr.io/azure-enterprise-demo"
+        "acraedpdev5f4sdu.azurecr.io/azure-enterprise-demo"
       ],
       "signatureVerification": {
         "level": "strict"
