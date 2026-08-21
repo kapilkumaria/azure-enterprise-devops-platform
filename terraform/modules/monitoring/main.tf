@@ -30,15 +30,16 @@ resource "azurerm_monitor_data_collection_rule" "container_insights" {
       extension_name = "ContainerInsights"
 
       streams = [
-        "Microsoft-ContainerLogV2",
-        "Microsoft-KubeEvents",
-        "Microsoft-KubePodInventory"
+        "Microsoft-ContainerInsights-Group-Default"
       ]
+
+      input_data_sources = []
 
       extension_json = jsonencode({
         dataCollectionSettings = {
           interval               = "1m"
           namespaceFilteringMode = "Off"
+          namespaces             = []
           enableContainerLogV2   = true
         }
       })
@@ -47,16 +48,13 @@ resource "azurerm_monitor_data_collection_rule" "container_insights" {
 
   data_flow {
     streams = [
-      "Microsoft-ContainerLogV2",
-      "Microsoft-KubeEvents",
-      "Microsoft-KubePodInventory"
+      "Microsoft-ContainerInsights-Group-Default"
     ]
 
     destinations = [
       "ciworkspace"
     ]
   }
-
   tags = var.tags
 }
 
@@ -116,6 +114,8 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "unhealthy_application
 
   evaluation_frequency = "PT5M"
   window_duration      = "PT10M"
+
+  skip_query_validation = true
 
   scopes = [
     azurerm_log_analytics_workspace.this.id
