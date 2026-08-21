@@ -24,8 +24,8 @@ variables:
   stagingNamespace: applications-staging
   prodNamespace: applications-prod
 
-  acrName: acraedpdevj30iq9
-  acrLoginServer: acraedpdevj30iq9.azurecr.io
+  acrName: acraedpdevw1qfrb
+  acrLoginServer: acraedpdevw1qfrb.azurecr.io
   imageRepository: azure-enterprise-demo
 
 
