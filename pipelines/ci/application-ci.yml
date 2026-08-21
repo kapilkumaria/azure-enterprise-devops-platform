@@ -201,4 +201,4 @@ stages:
               acrLoginServer: $(acrLoginServer)
               imageRepository: $(imageRepository)
               imageDigest: $(imageDigest)
-              signingKeyId: https://kv-aedp-dev-o4d626.vault.azure.net/keys/aedp-container-signing/4be9dce61b444b2ea4c7bd29605e9f03
+              signingKeyId: https://kv-aedp-dev-m0e0za.vault.azure.net/keys/aedp-container-signing/6736656339ad4a669c0dff76bbc77a59
