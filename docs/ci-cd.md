@@ -199,11 +199,9 @@ Trivy Filesystem Scan
         Stop Pipeline
 ```
 
-<!-- SCREENSHOT TODO
-Capture: Azure DevOps job showing successful Trivy filesystem scan
-Save as: docs/images/security/trivy-filesystem-scan.png
-Purpose: Evidence of shift-left source security validation
--->
+![Azure DevOps job showing successful Trivy filesystem scan](images/security/trivy-filesystem-scan.png)
+
+*Evidence of shift-left source security validation.*
 
 ---
 
@@ -280,11 +278,9 @@ Trivy Image Scan
         Stop Pipeline
 ```
 
-<!-- SCREENSHOT TODO
-Capture: Azure DevOps Trivy image scan job
-Save as: docs/images/security/trivy-image-scan.png
-Purpose: Evidence that the final deployable artifact is security scanned
--->
+![Azure DevOps Trivy image scan job](images/security/trivy-image-scan.png)
+
+*Evidence that the final deployable artifact is security scanned.*
 
 ---
 
@@ -323,11 +319,9 @@ Trivy
 Azure DevOps Pipeline Artifacts
 ```
 
-<!-- SCREENSHOT TODO
-Capture: Azure DevOps published security artifacts containing JSON and SARIF output
-Save as: docs/images/security/security-report-artifacts.png
-Purpose: Demonstrate retained security evidence
--->
+![Azure DevOps published security artifacts containing JSON and SARIF output](images/security/security-report-artifacts.png)
+
+*Demonstrate retained security evidence.*
 
 ---
 
@@ -356,11 +350,9 @@ AKS obtains registry access through Azure RBAC.
 
 This removes the need to embed static Docker registry credentials in Kubernetes application configuration.
 
-<!-- SCREENSHOT TODO
-Capture: ACR repository with application image tags
-Save as: docs/images/azure/acr-images.png
-Purpose: Demonstrate artifact publication and versioning
--->
+![ACR repository with application image tags](images/azure/acr-images.png)
+
+*Demonstrate artifact publication and versioning.*
 
 ---
 
@@ -504,11 +496,9 @@ The purpose of the Development stage is to:
 
 The deployment should fail immediately if the workload cannot successfully reach a healthy state.
 
-<!-- SCREENSHOT TODO
-Capture: Successful Development deployment stage
-Save as: docs/images/pipelines/cd-dev-success.png
-Purpose: Evidence of automatic lower-environment deployment
--->
+![Successful Development deployment stage](images/pipelines/cd-dev-success.png)
+
+*Evidence of automatic lower-environment deployment.*
 
 ---
 
@@ -528,11 +518,9 @@ Staging allows validation of:
 * autoscaling resources;
 * production-like release behavior.
 
-<!-- SCREENSHOT TODO
-Capture: Successful Staging deployment stage
-Save as: docs/images/pipelines/cd-staging-success.png
-Purpose: Evidence of controlled application promotion
--->
+![Successful Staging deployment stage](images/pipelines/cd-staging-success.png)
+
+*Evidence of controlled application promotion.*
 
 ---
 
@@ -572,11 +560,9 @@ Examples in a real enterprise environment could include:
 * business approval;
 * separation of duties.
 
-<!-- SCREENSHOT TODO
-Capture: Azure DevOps Production environment approval/check
-Save as: docs/images/pipelines/cd-production-approval.png
-Purpose: Demonstrate release governance
--->
+![Azure DevOps Production environment approval/check](images/pipelines/cd-production-approval.png)
+
+*Demonstrate release governance.*
 
 ---
 
@@ -588,11 +574,9 @@ Production configuration uses its environment-specific Kubernetes overlay and Se
 
 The production stage represents the final destination in the application's delivery lifecycle.
 
-<!-- SCREENSHOT TODO
-Capture: Successful Production deployment stage
-Save as: docs/images/pipelines/cd-prod-success.png
-Purpose: Evidence of complete Dev -> Staging -> Production delivery
--->
+![Successful Production deployment stage](images/pipelines/cd-prod-success.png)
+
+*Evidence of complete Dev -> Staging -> Production delivery.*
 
 ---
 

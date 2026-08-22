@@ -182,11 +182,9 @@ Typical operational questions include:
 * Is a condition recurring?
 * Did application behavior change after deployment?
 
-<!-- SCREENSHOT TODO
-Capture: Log Analytics query returning AKS-related telemetry
-Save as: docs/images/monitoring/log-analytics-query.png
-Purpose: Demonstrate query-driven operational troubleshooting
--->
+![Log Analytics query returning AKS-related telemetry](images/monitoring/log-analytics-query.png)
+
+*Demonstrate query-driven operational troubleshooting.*
 
 ---
 
@@ -218,11 +216,9 @@ Container Insights
  +--> Container telemetry
 ```
 
-<!-- SCREENSHOT TODO
-Capture: AKS Container Insights showing live cluster/workload telemetry
-Save as: docs/images/monitoring/container-insights.png
-Purpose: Demonstrate Azure-native Kubernetes observability
--->
+![AKS Container Insights showing live cluster/workload telemetry](images/monitoring/container-insights.png)
+
+*Demonstrate Azure-native Kubernetes observability.*
 
 ---
 
@@ -381,11 +377,9 @@ Scheduled Query
          Azure Monitor Alert
 ```
 
-<!-- SCREENSHOT TODO
-Capture: Azure Monitor scheduled query alert configuration
-Save as: docs/images/monitoring/application-alert-rule.png
-Purpose: Demonstrate proactive workload monitoring
--->
+![Azure Monitor scheduled query alert configuration](images/monitoring/application-alert-rule.png)
+
+*Demonstrate proactive workload monitoring.*
 
 ---
 
@@ -437,11 +431,9 @@ Depending on organizational requirements, Action Groups can integrate with notif
 
 The project provisions the Action Group through Terraform.
 
-<!-- SCREENSHOT TODO
-Capture: Azure Monitor Action Group
-Save as: docs/images/monitoring/action-group.png
-Purpose: Demonstrate alert notification architecture
--->
+![Azure Monitor Action Group](images/monitoring/action-group.png)
+
+*Demonstrate alert notification architecture.*
 
 ---
 
@@ -495,11 +487,9 @@ The HPA provides visibility into:
 * metric targets;
 * observed utilization.
 
-<!-- SCREENSHOT TODO
-Capture: kubectl get hpa showing application autoscaling resources
-Save as: docs/images/aks/hpa.png
-Purpose: Demonstrate application autoscaling and operational visibility
--->
+![kubectl get hpa showing application autoscaling resources](images/aks/hpa.png)
+
+*Demonstrate application autoscaling and operational visibility.*
 
 ---
 

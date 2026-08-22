@@ -251,6 +251,10 @@ Terraform manages:
 * alert rules
 * action groups
 
+![Azure resource group containing the provisioned platform resources](docs/images/azure/resource-group-overview.png)
+
+*Azure resource group overview demonstrating the Terraform-provisioned Azure platform footprint.*
+
 ## Platform Layer
 
 The Kubernetes platform provides:
@@ -394,11 +398,9 @@ terraform/environments/
 
 The current portfolio deployment uses the development infrastructure stack as the shared AKS platform while Kubernetes namespaces and overlays provide workload separation for Dev, Staging, and Production application releases.
 
-<!-- SCREENSHOT TODO
-Capture: Successful Terraform plan/apply showing Azure platform resources
-Save as: docs/images/terraform/terraform-apply-success.png
-Purpose: Demonstrate reproducible Infrastructure as Code provisioning
--->
+![Successful Terraform plan/apply showing Azure platform resources](docs/images/terraform/terraform-apply-success.png)
+
+*Demonstrates reproducible Infrastructure as Code provisioning.*
 
 ---
 
@@ -427,11 +429,9 @@ Application Infrastructure
        +--> Recreate
 ```
 
-<!-- SCREENSHOT TODO
-Capture: Terraform backend/storage configuration without exposing sensitive values
-Save as: docs/images/terraform/terraform-backend.png
-Purpose: Demonstrate remote state architecture and backend security
--->
+![Terraform backend/storage configuration without exposing sensitive values](docs/images/terraform/terraform-backend.png)
+
+*Demonstrates remote state architecture and backend security.*
 
 ---
 
@@ -450,11 +450,9 @@ Networking is managed through the reusable Terraform networking module.
 
 AKS receives the required Azure RBAC permissions over its subnet rather than relying on manually assigned permissions.
 
-<!-- SCREENSHOT TODO
-Capture: Azure VNet and subnet topology
-Save as: docs/images/azure/vnet-subnets.png
-Purpose: Demonstrate Terraform-managed Azure networking
--->
+![Azure VNet and subnet topology](docs/images/azure/vnet-subnets.png)
+
+*Demonstrates Terraform-managed Azure networking.*
 
 ---
 
@@ -477,23 +475,17 @@ Capabilities implemented include:
 * Key Vault integration
 * Azure monitoring integration
 
-<!-- SCREENSHOT TODO
-Capture: AKS cluster overview
-Save as: docs/images/aks/aks-cluster-overview.png
-Purpose: Demonstrate the running AKS platform
--->
+![AKS cluster overview](docs/images/aks/aks-cluster-overview.png)
 
-<!-- SCREENSHOT TODO
-Capture: AKS nodes/system and user node pools
-Save as: docs/images/aks/aks-node-pools.png
-Purpose: Demonstrate workload separation and autoscaling configuration
--->
+*Demonstrates the running AKS platform.*
 
-<!-- SCREENSHOT TODO
-Capture: kubectl get pods -A / workloads across application namespaces
-Save as: docs/images/aks/aks-workloads.png
-Purpose: Demonstrate healthy Kubernetes workloads
--->
+![AKS nodes/system and user node pools](docs/images/aks/aks-node-pools.png)
+
+*Demonstrates workload separation and autoscaling configuration.*
+
+![kubectl get pods -A / workloads across application namespaces](docs/images/aks/aks-workloads.png)
+
+*Demonstrates healthy Kubernetes workloads.*
 
 ---
 
@@ -521,11 +513,9 @@ AKS Deployment
 
 AKS receives the appropriate ACR pull permission through Azure RBAC rather than storing registry credentials inside Kubernetes configuration.
 
-<!-- SCREENSHOT TODO
-Capture: ACR repository showing application images/tags
-Save as: docs/images/azure/acr-images.png
-Purpose: Demonstrate private image lifecycle
--->
+![ACR repository showing application images/tags](docs/images/azure/acr-images.png)
+
+*Demonstrates private image lifecycle.*
 
 ---
 
@@ -567,11 +557,9 @@ Separate federated identity relationships support the application namespaces use
 
 This removes the requirement to place Azure client secrets inside application manifests.
 
-<!-- SCREENSHOT TODO
-Capture: Azure Managed Identity / federated credential configuration
-Save as: docs/images/security/workload-identity-federation.png
-Purpose: Demonstrate secretless Azure authentication
--->
+![Azure Managed Identity / federated credential configuration](docs/images/security/workload-identity-federation.png)
+
+*Demonstrates secretless Azure authentication.*
 
 ---
 
@@ -601,17 +589,13 @@ Application Pod
 
 This separates application configuration from sensitive secret material and avoids embedding cloud credentials directly in Kubernetes YAML.
 
-<!-- SCREENSHOT TODO
-Capture: Key Vault overview/secrets list with secret VALUES hidden
-Save as: docs/images/security/key-vault-overview.png
-Purpose: Demonstrate centralized secrets management
--->
+![Key Vault overview/secrets list with secret VALUES hidden](docs/images/security/key-vault-overview.png)
 
-<!-- SCREENSHOT TODO
-Capture: SecretProviderClass and application pod verification
-Save as: docs/images/security/key-vault-csi.png
-Purpose: Demonstrate Key Vault CSI integration
--->
+*Demonstrates centralized secrets management.*
+
+![SecretProviderClass and application pod verification](docs/images/security/key-vault-csi.png)
+
+*Demonstrates Key Vault CSI integration.*
 
 > Never expose actual secret values in portfolio screenshots.
 
@@ -689,11 +673,9 @@ Trivy is executed against the source workspace before application delivery.
 
 This shifts vulnerability and configuration detection toward the beginning of the software delivery lifecycle.
 
-<!-- SCREENSHOT TODO
-Capture: Successful Trivy filesystem/source scan
-Save as: docs/images/security/trivy-filesystem-scan.png
-Purpose: Demonstrate shift-left DevSecOps control
--->
+![Successful Trivy filesystem/source scan](docs/images/security/trivy-filesystem-scan.png)
+
+*Demonstrates shift-left DevSecOps control.*
 
 ## Container Image Scan
 
@@ -701,11 +683,9 @@ The resulting container image is scanned before being accepted into the deployme
 
 This provides security coverage of the actual container artifact rather than relying only on source analysis.
 
-<!-- SCREENSHOT TODO
-Capture: Successful Trivy container image scan
-Save as: docs/images/security/trivy-image-scan.png
-Purpose: Demonstrate container supply-chain security gate
--->
+![Successful Trivy container image scan](docs/images/security/trivy-image-scan.png)
+
+*Demonstrates container supply-chain security gate.*
 
 ## Security Artifacts
 
@@ -713,19 +693,15 @@ Security results are published as pipeline artifacts in formats suitable for bot
 
 These include JSON and SARIF reports.
 
-<!-- SCREENSHOT TODO
-Capture: Azure DevOps pipeline security artifacts showing JSON/SARIF reports
-Save as: docs/images/security/security-report-artifacts.png
-Purpose: Demonstrate security evidence retention
--->
+![Azure DevOps pipeline security artifacts showing JSON/SARIF reports](docs/images/security/security-report-artifacts.png)
+
+*Demonstrates security evidence retention.*
 
 ## CI Pipeline Evidence
 
-<!-- SCREENSHOT TODO
-Capture: Full successful Azure DevOps CI pipeline
-Save as: docs/images/pipelines/ci-pipeline-success.png
-Purpose: Primary evidence of the CI implementation
--->
+![Full successful Azure DevOps CI pipeline](docs/images/pipelines/ci-pipeline-success.png)
+
+*Primary evidence of the CI implementation.*
 
 ---
 
@@ -759,29 +735,21 @@ Production
 
 Reusable deployment templates reduce duplication between environments while Kubernetes overlays provide environment-specific configuration.
 
-<!-- SCREENSHOT TODO
-Capture: Successful Dev deployment stage
-Save as: docs/images/pipelines/cd-dev-success.png
-Purpose: Demonstrate automated development deployment
--->
+![Successful Dev deployment stage](docs/images/pipelines/cd-dev-success.png)
 
-<!-- SCREENSHOT TODO
-Capture: Successful Staging deployment stage
-Save as: docs/images/pipelines/cd-staging-success.png
-Purpose: Demonstrate controlled environment promotion
--->
+*Demonstrates automated development deployment.*
 
-<!-- SCREENSHOT TODO
-Capture: Azure DevOps Production approval/check
-Save as: docs/images/pipelines/cd-production-approval.png
-Purpose: Demonstrate production governance
--->
+![Successful Staging deployment stage](docs/images/pipelines/cd-staging-success.png)
 
-<!-- SCREENSHOT TODO
-Capture: Successful Production deployment
-Save as: docs/images/pipelines/cd-prod-success.png
-Purpose: Demonstrate complete Dev -> Staging -> Production delivery
--->
+*Demonstrates controlled environment promotion.*
+
+![Azure DevOps Production approval/check](docs/images/pipelines/cd-production-approval.png)
+
+*Demonstrates production governance.*
+
+![Successful Production deployment](docs/images/pipelines/cd-prod-success.png)
+
+*Demonstrates complete Dev -> Staging -> Production delivery.*
 
 ---
 
@@ -798,6 +766,10 @@ Staging
      v
 Production
 ```
+
+![Azure DevOps deployment environments for development, staging, and production](docs/images/pipelines/ado-environments.png)
+
+*Azure DevOps environments model the Dev → Staging → Production promotion path and provide the governance boundary for controlled releases.*
 
 The purpose of environment promotion is not simply to run three copies of an application.
 
@@ -876,11 +848,9 @@ The deployment configuration includes non-root execution and explicit SecurityCo
 
 The objective is to ensure the application does not depend on unnecessary root-level permissions.
 
-<!-- SCREENSHOT TODO
-Capture: kubectl output/YAML demonstrating non-root SecurityContext
-Save as: docs/images/security/kubernetes-security-context.png
-Purpose: Demonstrate workload hardening
--->
+![kubectl output/YAML demonstrating non-root SecurityContext](docs/images/security/kubernetes-security-context.png)
+
+*Demonstrates workload hardening.*
 
 ---
 
@@ -904,31 +874,31 @@ This provides visibility into both Kubernetes workloads and AKS control-plane/pl
 
 Container Insights provides operational visibility into AKS nodes, controllers, pods, and containers.
 
-<!-- SCREENSHOT TODO
-Capture: AKS Container Insights showing active cluster/workload telemetry
-Save as: docs/images/monitoring/container-insights.png
-Purpose: Demonstrate platform observability
--->
+![AKS Container Insights showing active cluster/workload telemetry](docs/images/monitoring/container-insights.png)
+
+*Demonstrates platform observability.*
 
 ## Log Analytics
 
 Log Analytics provides a central workspace for querying Azure and Kubernetes telemetry.
 
-<!-- SCREENSHOT TODO
-Capture: Relevant Log Analytics query and returned AKS data
-Save as: docs/images/monitoring/log-analytics-query.png
-Purpose: Demonstrate centralized operational investigation
--->
+![Relevant Log Analytics query and returned AKS data](docs/images/monitoring/log-analytics-query.png)
+
+*Demonstrates centralized operational investigation.*
 
 ## Alerting
 
 An Azure Monitor scheduled query alert detects unhealthy application pod conditions and integrates with an Action Group.
 
-<!-- SCREENSHOT TODO
-Capture: Azure Monitor alert rule
-Save as: docs/images/monitoring/application-alert-rule.png
-Purpose: Demonstrate proactive operational alerting
--->
+![Azure Monitor alert rule](docs/images/monitoring/application-alert-rule.png)
+
+*Demonstrates proactive operational alerting.*
+
+The scheduled query alert integrates with an Azure Monitor Action Group that defines the notification path for operational events.
+
+![Azure Monitor Action Group](docs/images/monitoring/action-group.png)
+
+*Demonstrates the alert notification and response architecture.*
 
 ---
 
@@ -965,11 +935,9 @@ AKS Cluster Autoscaler
 Additional Node Capacity
 ```
 
-<!-- SCREENSHOT TODO
-Capture: kubectl get hpa and relevant deployment replica information
-Save as: docs/images/aks/hpa.png
-Purpose: Demonstrate application autoscaling
--->
+![kubectl get hpa and relevant deployment replica information](docs/images/aks/hpa.png)
+
+*Demonstrates application autoscaling.*
 
 ---
 
@@ -1055,11 +1023,9 @@ The Terraform backend is managed separately so infrastructure state management r
 
 This also reduces unnecessary cloud cost for a portfolio/lab environment.
 
-<!-- SCREENSHOT TODO
-Capture: Terraform recreation/apply after a previous complete destroy
-Save as: docs/images/terraform/platform-recreation.png
-Purpose: Demonstrate infrastructure reproducibility and lifecycle management
--->
+![Terraform recreation/apply after a previous complete destroy](docs/images/terraform/terraform-apply-success.png)
+
+*Demonstrates infrastructure reproducibility and lifecycle management.*
 
 ---
 
@@ -1228,7 +1194,7 @@ docs/images/
 └── monitoring/
 ```
 
-Screenshots will demonstrate:
+Screenshots demonstrate:
 
 * architecture;
 * Terraform provisioning;
@@ -1325,16 +1291,30 @@ The backend infrastructure should be treated separately from the ephemeral appli
 
 # Status
 
-**Core platform engineering: Complete**
+**Project implementation: Complete**
 
-Remaining portfolio activities:
+The platform has been provisioned, validated, destroyed, recreated, and exercised through the complete CI/CD delivery lifecycle.
 
-* final architecture diagram;
-* final documentation;
-* infrastructure recreation validation;
-* final end-to-end CI/CD run;
-* screenshot/evidence collection;
-* final repository review.
+Validated capabilities include:
+
+* Terraform-based Azure infrastructure provisioning;
+* remote Terraform state management;
+* AKS system and user node pools;
+* Azure Container Registry integration;
+* Microsoft Entra Workload Identity;
+* Azure Key Vault CSI integration;
+* Dev → Staging → Production deployment promotion;
+* production approval governance;
+* Trivy source and container image security gates;
+* retained JSON/SARIF security evidence;
+* hardened Kubernetes workloads;
+* Horizontal Pod Autoscaling;
+* Azure Monitor and Container Insights;
+* Log Analytics;
+* scheduled query alerting and Action Groups;
+* infrastructure destruction and reproducible recreation.
+
+The Azure workload infrastructure may be destroyed when not required to minimize portfolio/lab operating cost. The repository remains the authoritative definition required to recreate the platform.
 
 ---
 

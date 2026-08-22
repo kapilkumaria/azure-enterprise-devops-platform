@@ -225,11 +225,9 @@ Trivy Filesystem Scan
           Fail Pipeline
 ```
 
-<!-- SCREENSHOT TODO
-Capture: Successful Trivy filesystem scan in Azure DevOps
-Save as: docs/images/security/trivy-filesystem-scan.png
-Purpose: Demonstrate source-level security validation
--->
+![Successful Trivy filesystem scan in Azure DevOps](images/security/trivy-filesystem-scan.png)
+
+*Demonstrate source-level security validation.*
 
 ---
 
@@ -268,11 +266,9 @@ Image Scan
 Approved Container Artifact
 ```
 
-<!-- SCREENSHOT TODO
-Capture: Successful Trivy container image scan
-Save as: docs/images/security/trivy-image-scan.png
-Purpose: Demonstrate security validation of the actual deployable artifact
--->
+![Successful Trivy container image scan](images/security/trivy-image-scan.png)
+
+*Demonstrate security validation of the actual deployable artifact.*
 
 ---
 
@@ -344,11 +340,9 @@ It also improves:
 * historical analysis;
 * integration with security systems.
 
-<!-- SCREENSHOT TODO
-Capture: Azure DevOps pipeline artifacts containing JSON and SARIF reports
-Save as: docs/images/security/security-report-artifacts.png
-Purpose: Demonstrate retained and auditable security evidence
--->
+![Azure DevOps pipeline artifacts containing JSON and SARIF reports](images/security/security-report-artifacts.png)
+
+*Demonstrate retained and auditable security evidence.*
 
 ---
 
@@ -550,11 +544,9 @@ Application Workload Managed Identity
 
 Environment-aware federation prevents unrelated Kubernetes identities from automatically obtaining Azure access.
 
-<!-- SCREENSHOT TODO
-Capture: Azure Managed Identity federated credentials for Dev/Staging/Prod
-Save as: docs/images/security/workload-identity-federation.png
-Purpose: Demonstrate environment-aware secretless authentication
--->
+![Azure Managed Identity federated credentials for Dev/Staging/Prod](images/security/workload-identity-federation.png)
+
+*Demonstrate environment-aware secretless authentication.*
 
 ---
 
@@ -608,11 +600,9 @@ Azure Key Vault
 
 Key Vault provides centralized secret storage together with Azure identity and access-control integration.
 
-<!-- SCREENSHOT TODO
-Capture: Azure Key Vault overview or secret inventory with secret values completely hidden
-Save as: docs/images/security/key-vault-overview.png
-Purpose: Demonstrate centralized secrets management
--->
+![Azure Key Vault overview or secret inventory with secret values completely hidden](images/security/key-vault-overview.png)
+
+*Demonstrate centralized secrets management.*
 
 ---
 
@@ -665,11 +655,9 @@ Application
 
 This allows Kubernetes workloads to consume external secret material while Azure Key Vault remains the authoritative secret store.
 
-<!-- SCREENSHOT TODO
-Capture: SecretProviderClass and successful pod secret mounting/reference
-Save as: docs/images/security/key-vault-csi.png
-Purpose: Demonstrate AKS-to-Key-Vault secrets integration
--->
+![SecretProviderClass and successful pod secret mounting/reference](images/security/key-vault-csi.png)
+
+*Demonstrate AKS-to-Key-Vault secrets integration.*
 
 ---
 
@@ -746,11 +734,9 @@ Container requires host-level access
 
 Unless there is a strong technical requirement, application containers should operate with the minimum required privilege.
 
-<!-- SCREENSHOT TODO
-Capture: Kubernetes Deployment/securityContext showing hardened non-root configuration
-Save as: docs/images/security/kubernetes-security-context.png
-Purpose: Demonstrate workload-level runtime hardening
--->
+![Kubernetes Deployment/securityContext showing hardened non-root configuration](images/security/kubernetes-security-context.png)
+
+*Demonstrate workload-level runtime hardening.*
 
 ---
 
@@ -1010,11 +996,9 @@ Terraform Backend
 
 This materially reduces unnecessary exposure of sensitive Terraform state infrastructure.
 
-<!-- SCREENSHOT TODO
-Capture: Terraform backend storage networking showing default Deny and authorized access without exposing sensitive identifiers
-Save as: docs/images/security/terraform-backend-networking.png
-Purpose: Demonstrate Terraform backend network hardening
--->
+![Terraform backend storage networking showing default Deny and authorized access without exposing sensitive identifiers](images/security/terraform-backend-networking.png)
+
+*Demonstrate Terraform backend network hardening.*
 
 ---
 
