@@ -1,5 +1,13 @@
 # Azure Enterprise DevOps Platform — Architecture
 
+
+## Detailed Architecture Diagram
+
+The following diagram provides the detailed engineering view of the platform, including infrastructure provisioning, Azure DevOps delivery workflows, AKS workload architecture, identity federation, secrets management, and observability integrations.
+
+![Detailed Azure Enterprise DevOps Platform Architecture](images/architecture/azure-enterprise-devops-platform-detailed.svg)
+
+
 ## Overview
 
 The Azure Enterprise DevOps Platform is designed as a production-oriented cloud-native delivery platform for containerized applications running on Azure Kubernetes Service.

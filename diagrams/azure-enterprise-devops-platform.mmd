@@ -1,235 +1,146 @@
-flowchart TB
+%%{
+  init: {
+    "theme": "base",
+    "flowchart": {
+      "curve": "basis",
+      "nodeSpacing": 45,
+      "rankSpacing": 65,
+      "htmlLabels": true
+    }
+  }
+}%%
+
+flowchart LR
 
     %% =========================================================
-    %% DEVELOPER / SOURCE
+    %% SOURCE
     %% =========================================================
 
-    DEV["👨‍💻 Developer"]
-    REPO["Git Repository<br/>Application + Terraform + Kubernetes + Pipelines"]
-
-    DEV -->|Commit / Pull Request| REPO
-
+    DEV["Developer / Git"]
+    AGENT["AWS EC2 Self-hosted Agent"]
 
     %% =========================================================
     %% AZURE DEVOPS
     %% =========================================================
 
     subgraph ADO["Azure DevOps"]
+        direction LR
+
         CI["CI Pipeline"]
         CD["CD Pipeline"]
 
-        VALIDATE["Python / Application Validation"]
-        TRIVYFS["Trivy Filesystem Scan"]
-        BUILD["Docker Build"]
-        TRIVYIMG["Trivy Image Scan"]
-        REPORTS["JSON / SARIF<br/>Security Artifacts"]
-
-        DEVSTAGE["Dev Deployment"]
-        STAGESTAGE["Staging Deployment"]
-        APPROVAL["Production Approval"]
-        PRODSTAGE["Production Deployment"]
-
-        CI --> VALIDATE
-        VALIDATE --> TRIVYFS
-        TRIVYFS --> BUILD
-        BUILD --> TRIVYIMG
-        TRIVYIMG --> REPORTS
-
-        CD --> DEVSTAGE
-        DEVSTAGE --> STAGESTAGE
-        STAGESTAGE --> APPROVAL
-        APPROVAL --> PRODSTAGE
+        CI -->|"Signed immutable artifact"| CD
     end
-
-    REPO --> CI
-
-
-    %% =========================================================
-    %% SELF-HOSTED PIPELINE AGENT
-    %% =========================================================
-
-    subgraph AWS["AWS"]
-        AGENT["EC2 Self-Hosted<br/>Azure DevOps Agent<br/><br/>Terraform<br/>Azure CLI<br/>Docker<br/>kubectl<br/>Trivy"]
-    end
-
-    CI -.Pipeline Jobs.-> AGENT
-    CD -.Pipeline Jobs.-> AGENT
-
 
     %% =========================================================
     %% TERRAFORM
     %% =========================================================
 
-    subgraph TF["Terraform Infrastructure as Code"]
+    subgraph TF["Terraform IaC"]
+        direction LR
 
-        BOOTSTRAP["Bootstrap<br/>Remote State Backend"]
+        STATE["Remote State"]
+        MODULES["Reusable Modules"]
 
-        MODULES["Reusable Modules<br/><br/>networking<br/>aks<br/>acr<br/>identity<br/>key-vault<br/>monitoring"]
-
-        ENV["Environment Composition<br/>terraform/environments/dev"]
-
-        BOOTSTRAP --> ENV
-        MODULES --> ENV
+        STATE --> MODULES
     end
 
-    REPO --> TF
-    AGENT -->|terraform plan / apply| ENV
-
-
     %% =========================================================
-    %% AZURE
+    %% MICROSOFT AZURE
     %% =========================================================
 
     subgraph AZURE["Microsoft Azure"]
+        direction LR
 
-        subgraph RG["Resource Group — rg-aedp-dev-cac"]
+        ACR["Azure Container Registry"]
 
-            %% NETWORK
+        subgraph AKS["Azure Kubernetes Service"]
+            direction TB
 
-            subgraph VNET["Virtual Network"]
-                AKSSUBNET["AKS Subnet"]
-                PESUBNET["Private Endpoint Subnet"]
+            NODES["System + User Node Pools"]
+
+            subgraph ENV["Application Environments"]
+                direction LR
+                DEVNS["Dev"]
+                STGNS["Staging"]
+                PRODNS["Production"]
             end
 
+            WORKLOAD["Deployments / Services / HPA"]
 
-            %% REGISTRY
+            NODES --> ENV
+            ENV --> WORKLOAD
+        end
 
-            ACR["Azure Container Registry<br/>ACR"]
+        subgraph IDSEC["Identity & Secrets"]
+            direction LR
 
-
-            %% IDENTITY
-
-            subgraph IDENTITY["Microsoft Entra / Managed Identity"]
-                CONTROLID["AKS Control Plane<br/>Managed Identity"]
-                WORKLOADID["Application Workload<br/>Managed Identity"]
-                OIDC["AKS OIDC Issuer"]
-                FICDEV["Federated Credential<br/>Dev"]
-                FICSTG["Federated Credential<br/>Staging"]
-                FICPROD["Federated Credential<br/>Prod"]
-            end
-
-
-            %% KEY VAULT
-
+            WI["Entra Workload Identity"]
             KV["Azure Key Vault"]
 
+            WI -->|"RBAC"| KV
+        end
 
-            %% AKS
+        subgraph OBS["Observability"]
+            direction LR
 
-            subgraph AKS["Azure Kubernetes Service"]
+            MON["Container Insights"]
+            LAW["Log Analytics"]
+            ALERT["Alerts / Action Group"]
 
-                SYSPOOL["System Node Pool"]
-                USERPOOL["User Node Pool"]
-
-                subgraph K8S["Kubernetes Workloads"]
-
-                    subgraph DEVNS["Dev Namespace"]
-                        DEVAPP["Application"]
-                        DEVSA["ServiceAccount"]
-                        DEVHPA["HPA"]
-                    end
-
-                    subgraph STGNS["Staging Namespace"]
-                        STGAPP["Application"]
-                        STGSA["ServiceAccount"]
-                        STGHPA["HPA"]
-                    end
-
-                    subgraph PRODENV["Production Namespace"]
-                        PRODAPP["Application"]
-                        PRODSA["ServiceAccount"]
-                        PRODHPA["HPA"]
-                    end
-
-                    CSI["Secrets Store CSI Driver"]
-                end
-
-                SYSPOOL --> K8S
-                USERPOOL --> DEVAPP
-                USERPOOL --> STGAPP
-                USERPOOL --> PRODAPP
-            end
-
-
-            %% OBSERVABILITY
-
-            subgraph OBS["Azure-Native Observability"]
-                DCR["Data Collection Rule"]
-                LAW["Log Analytics Workspace"]
-                INSIGHTS["Container Insights"]
-                ALERT["Azure Monitor<br/>Scheduled Query Alert"]
-                ACTION["Action Group"]
-
-                DCR --> LAW
-                INSIGHTS --> LAW
-                LAW --> ALERT
-                ALERT --> ACTION
-            end
+            MON --> LAW
+            LAW --> ALERT
         end
     end
-
 
     %% =========================================================
     %% DELIVERY FLOW
     %% =========================================================
 
-    TRIVYIMG -->|Approved Image| ACR
+    DEV -->|"Source change"| CI
 
-    ACR -->|AcrPull via Azure RBAC| AKS
+    AGENT -.->|"Runs"| CI
+    AGENT -.->|"Runs"| CD
 
-    DEVSTAGE -->|kubectl / Kustomize| DEVAPP
-    STAGESTAGE -->|kubectl / Kustomize| STGAPP
-    PRODSTAGE -->|kubectl / Kustomize| PRODAPP
+    CI -->|"Push image"| ACR
 
+    ACR -->|"Image digest"| AKS
 
-    %% =========================================================
-    %% NETWORK / AKS
-    %% =========================================================
-
-    AKSSUBNET --> AKS
-    CONTROLID --> AKSSUBNET
-
+    CD -->|"Deploy"| AKS
 
     %% =========================================================
-    %% WORKLOAD IDENTITY
+    %% IDENTITY / SECRETS
     %% =========================================================
 
-    DEVSA --> OIDC
-    STGSA --> OIDC
-    PRODSA --> OIDC
-
-    OIDC --> FICDEV
-    OIDC --> FICSTG
-    OIDC --> FICPROD
-
-    FICDEV --> WORKLOADID
-    FICSTG --> WORKLOADID
-    FICPROD --> WORKLOADID
-
-    WORKLOADID -->|Key Vault Secrets User| KV
-
-    KV --> CSI
-    CSI --> DEVAPP
-    CSI --> STGAPP
-    CSI --> PRODAPP
-
+    AKS -->|"OIDC"| WI
+    KV -->|"CSI secret"| AKS
 
     %% =========================================================
-    %% MONITORING
+    %% OBSERVABILITY
     %% =========================================================
 
-    AKS --> DCR
-    AKS --> INSIGHTS
-    AKS --> LAW
-
+    AKS -.->|"Telemetry"| MON
 
     %% =========================================================
     %% TERRAFORM PROVISIONING
     %% =========================================================
 
-    ENV -.Provision / Configure.-> VNET
-    ENV -.Provision / Configure.-> AKS
-    ENV -.Provision / Configure.-> ACR
-    ENV -.Provision / Configure.-> KV
-    ENV -.Provision / Configure.-> IDENTITY
-    ENV -.Provision / Configure.-> OBS
+    MODULES -.->|"Provision"| AZURE
+
+    %% =========================================================
+    %% STYLING
+    %% =========================================================
+
+    classDef external fill:#f6f8fa,stroke:#57606a,stroke-width:1.5px,color:#24292f;
+    classDef pipeline fill:#eaf2ff,stroke:#0969da,stroke-width:2px,color:#24292f;
+    classDef azure fill:#eef6ff,stroke:#0078d4,stroke-width:1.5px,color:#24292f;
+    classDef security fill:#f5f0ff,stroke:#8250df,stroke-width:1.5px,color:#24292f;
+    classDef observability fill:#effaf3,stroke:#1a7f37,stroke-width:1.5px,color:#24292f;
+    classDef terraform fill:#f7f0ff,stroke:#844fba,stroke-width:1.5px,color:#24292f;
+
+    class DEV,AGENT external;
+    class CI,CD pipeline;
+    class ACR,NODES,DEVNS,STGNS,PRODNS,WORKLOAD azure;
+    class WI,KV security;
+    class MON,LAW,ALERT observability;
+    class STATE,MODULES terraform;
