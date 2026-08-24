@@ -205,7 +205,7 @@ Azure Kubernetes Service
 
 Terraform provisions the underlying Azure platform, including networking, AKS, ACR, Key Vault, managed identities, federated credentials, Azure RBAC, monitoring resources, data collection rules, diagnostic settings, alert rules, and notification components.
 
-![Azure Enterprise DevOps Platform Architecture](docs/images/architecture/azure-enterprise-devops-platform.svg)
+![Azure Enterprise DevOps Platform Architecture](docs/images/architecture/azure-enterprise-devops-platform.png)
 
 > Detailed architecture documentation: [docs/architecture.md](docs/architecture.md)
 
@@ -213,30 +213,30 @@ Terraform provisions the underlying Azure platform, including networking, AKS, A
 
 # Technology Stack
 
-| Area | Technology |
-| --- | --- |
-| Cloud Platform | Microsoft Azure |
-| Infrastructure as Code | Terraform |
-| CI/CD | Azure DevOps YAML Pipelines |
-| Kubernetes | Azure Kubernetes Service |
-| Container Registry | Azure Container Registry |
-| Containers | Docker |
-| Application Platform | Kubernetes |
-| Configuration Management | Kustomize |
-| Secrets | Azure Key Vault |
-| Authentication | Microsoft Entra Workload Identity |
-| Federation | OIDC / Federated Identity Credentials |
-| Security Scanning | Trivy |
-| Artifact Signing | Notation |
-| Signing Key | Azure Key Vault-backed key |
-| Monitoring | Azure Monitor |
-| Logging / Analytics | Log Analytics |
-| Kubernetes Monitoring | Container Insights |
-| Scaling | Kubernetes HPA / AKS node autoscaling |
-| Pipeline Worker | Self-hosted Azure DevOps agent |
-| Agent Infrastructure | AWS EC2 |
-| Source Control | Git |
-| Application | Python |
+| Area                     | Technology                            |
+| ------------------------ | ------------------------------------- |
+| Cloud Platform           | Microsoft Azure                       |
+| Infrastructure as Code   | Terraform                             |
+| CI/CD                    | Azure DevOps YAML Pipelines           |
+| Kubernetes               | Azure Kubernetes Service              |
+| Container Registry       | Azure Container Registry              |
+| Containers               | Docker                                |
+| Application Platform     | Kubernetes                            |
+| Configuration Management | Kustomize                             |
+| Secrets                  | Azure Key Vault                       |
+| Authentication           | Microsoft Entra Workload Identity     |
+| Federation               | OIDC / Federated Identity Credentials |
+| Security Scanning        | Trivy                                 |
+| Artifact Signing         | Notation                              |
+| Signing Key              | Azure Key Vault-backed key            |
+| Monitoring               | Azure Monitor                         |
+| Logging / Analytics      | Log Analytics                         |
+| Kubernetes Monitoring    | Container Insights                    |
+| Scaling                  | Kubernetes HPA / AKS node autoscaling |
+| Pipeline Worker          | Self-hosted Azure DevOps agent        |
+| Agent Infrastructure     | AWS EC2                               |
+| Source Control           | Git                                   |
+| Application              | Python                                |
 
 ---
 
@@ -1423,14 +1423,14 @@ Evidence includes:
 
 Additional technical documentation is maintained under `docs/`.
 
-| Document | Purpose |
-| --- | --- |
-| [Architecture](docs/architecture.md) | Architecture, data flows, identity flows, and engineering decisions |
-| [Implementation](docs/implementation.md) | Detailed platform implementation walkthrough |
-| [CI/CD](docs/ci-cd.md) | Azure DevOps CI/CD design, artifact handling, and reusable pipeline architecture |
-| [Security](docs/security.md) | DevSecOps, Workload Identity, secrets, RBAC, artifact security, and container hardening |
-| [Monitoring](docs/monitoring.md) | Azure Monitor, Log Analytics, Container Insights, DCRs, alerts, and Action Groups |
-| [Troubleshooting](docs/troubleshooting.md) | Problems encountered, investigation, root causes, remediation, and lessons learned |
+| Document                                   | Purpose                                                                                 |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [Architecture](docs/architecture.md)       | Architecture, data flows, identity flows, and engineering decisions                     |
+| [Implementation](docs/implementation.md)   | Detailed platform implementation walkthrough                                            |
+| [CI/CD](docs/ci-cd.md)                     | Azure DevOps CI/CD design, artifact handling, and reusable pipeline architecture        |
+| [Security](docs/security.md)               | DevSecOps, Workload Identity, secrets, RBAC, artifact security, and container hardening |
+| [Monitoring](docs/monitoring.md)           | Azure Monitor, Log Analytics, Container Insights, DCRs, alerts, and Action Groups       |
+| [Troubleshooting](docs/troubleshooting.md) | Problems encountered, investigation, root causes, remediation, and lessons learned      |
 
 ---
 
