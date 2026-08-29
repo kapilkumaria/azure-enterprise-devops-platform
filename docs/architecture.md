@@ -1,11 +1,10 @@
 # Azure Enterprise DevOps Platform — Architecture
 
+## Platform Architecture
 
-## Detailed Architecture Diagram
+The following diagram presents the end-to-end architecture of the platform, including infrastructure provisioning, Azure DevOps delivery workflows, AKS workload architecture, identity federation, secrets management, security controls, and Azure-native observability.
 
-The following diagram provides the detailed engineering view of the platform, including infrastructure provisioning, Azure DevOps delivery workflows, AKS workload architecture, identity federation, secrets management, and observability integrations.
-
-![Detailed Azure Enterprise DevOps Platform Architecture](images/architecture/azure-enterprise-devops-platform-detailed.svg)
+![Detailed Azure Enterprise DevOps Platform Architecture](../diagrams/azure-enterprise-devops-platform-architecture.png)
 
 
 ## Overview
@@ -21,7 +20,6 @@ The architecture combines:
 * Azure Container Registry
 * Azure Key Vault
 * Microsoft Entra Workload Identity
-* Kubernetes
 * Kustomize
 * Trivy
 * Azure Monitor
