@@ -1247,7 +1247,7 @@ Scanning only source code cannot guarantee that the final container artifact is 
 
 Container image tags are mutable.
 
-The platform therefore captures immutable digests, signs artifacts using Notation, verifies artifact provenance, and promotes the same digest through deployment environments.
+The platform therefore captures immutable digests, signs artifacts using Notation, verifies the artifact signature, and promotes the same digest through deployment environments.
 
 This creates a stronger build-once/promote-many delivery model.
 
@@ -1362,7 +1362,7 @@ The resulting platform demonstrates the ability to:
 - build and publish container images to ACR;
 - capture immutable container image digests;
 - sign container artifacts using Notation and Azure Key Vault;
-- verify artifact provenance before deployment;
+- verify the artifact signature before deployment;
 - promote the same immutable artifact across environments;
 - secure Kubernetes workloads using non-root execution and SecurityContext controls;
 - implement secretless cloud authentication using Workload Identity;
