@@ -109,7 +109,7 @@ A manually managed cloud environment creates several problems:
 - infrastructure configuration can drift between environments;
 - deployments can become dependent on individual engineers;
 - long-lived credentials may be embedded in application configuration;
-- container artifacts may be deployed without provenance verification;
+- container artifacts may be deployed without cryptographic integrity and authenticity verification;
 - security scanning may happen too late in the delivery lifecycle;
 - production releases may occur without appropriate controls;
 - infrastructure changes may not be reproducible;
@@ -117,7 +117,7 @@ A manually managed cloud environment creates several problems:
 - development, staging, and production environments may behave differently;
 - cloud resources may remain running unnecessarily and increase operating cost.
 
-This project addresses those problems by creating an automated platform where infrastructure, application configuration, security controls, artifact provenance, and deployment workflows are expressed as code.
+This project addresses those problems by creating an automated platform where infrastructure, application configuration, security controls, artifact trust, and deployment workflows are expressed as code.
 
 ---
 
@@ -136,7 +136,7 @@ The primary objectives were to:
 - publish machine-readable security evidence;
 - capture immutable container image digests;
 - sign container artifacts using Notation with an Azure Key Vault-backed signing key;
-- verify container signatures before deployment;
+- verify container artifact signatures before deployment;
 - promote the same immutable image digest across Dev, Staging, and Production;
 - implement controlled production promotion;
 - harden Kubernetes workloads;
@@ -218,10 +218,10 @@ Terraform provisions the underlying Azure platform, including networking, AKS, A
 | Cloud Platform           | Microsoft Azure                       |
 | Infrastructure as Code   | Terraform                             |
 | CI/CD                    | Azure DevOps YAML Pipelines           |
-| Kubernetes               | Azure Kubernetes Service              |
+| Managed Kubernetes       | Azure Kubernetes Service              |
 | Container Registry       | Azure Container Registry              |
 | Containers               | Docker                                |
-| Application Platform     | Kubernetes                            |
+| Container Orchestration  | Kubernetes                            |
 | Configuration Management | Kustomize                             |
 | Secrets                  | Azure Key Vault                       |
 | Authentication           | Microsoft Entra Workload Identity     |
@@ -235,7 +235,7 @@ Terraform provisions the underlying Azure platform, including networking, AKS, A
 | Scaling                  | Kubernetes HPA / AKS node autoscaling |
 | Pipeline Worker          | Self-hosted Azure DevOps agent        |
 | Agent Infrastructure     | AWS EC2                               |
-| Source Control           | Git                                   |
+| Source Control           | Git / GitHub                          |
 | Application              | Python                                |
 
 ---
@@ -324,7 +324,7 @@ Azure-native monitoring provides:
 │       └── main.py
 │
 ├── diagrams/
-│   └── azure-enterprise-devops-platform.mmd
+│   └── azure-enterprise-devops-platform-architecture.png
 │
 ├── docs/
 │   ├── architecture.md
@@ -566,13 +566,16 @@ Security Scan
 Azure Container Registry
      |
      v
-Immutable Digest
+Resolve Immutable Image Digest
      |
      v
-Notation Signature
+Sign Digest with Notation
      |
      v
-Verified AKS Deployment
+Verify Signed Artifact
+     |
+     v
+AKS Deployment
 ```
 
 AKS receives ACR pull permission through Azure RBAC rather than storing registry credentials inside Kubernetes configuration.
@@ -778,7 +781,7 @@ These include JSON and SARIF reports.
 
 The CI pipeline captures the immutable container image digest and signs the artifact using Notation with an Azure Key Vault-backed signing key.
 
-The corresponding trust certificate and trust policy are used to verify artifact provenance.
+The corresponding trust certificate and trust policy are used to verify the artifact signature and establish trust in the signed image.
 
 The supply-chain flow is:
 
@@ -853,10 +856,13 @@ The deployment model follows an important principle:
 Build Once
    |
    v
-Verify Once
+Sign Once
    |
    v
-Promote the Same Immutable Artifact
+Promote the Same Immutable Digest
+   |
+   v
+Verify Before Deployment
 ```
 
 Reusable deployment templates reduce duplication between environments while Kubernetes configuration provides environment-specific deployment behavior.
