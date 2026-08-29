@@ -205,7 +205,7 @@ Azure Kubernetes Service
 
 Terraform provisions the underlying Azure platform, including networking, AKS, ACR, Key Vault, managed identities, federated credentials, Azure RBAC, monitoring resources, data collection rules, diagnostic settings, alert rules, and notification components.
 
-![Azure Enterprise DevOps Platform Architecture](docs/images/architecture/azure-enterprise-devops-platform.png)
+![Azure Enterprise DevOps Platform Architecture](diagrams/azure-enterprise-devops-platform-architecture.png)
 
 > Detailed architecture documentation: [docs/architecture.md](docs/architecture.md)
 
