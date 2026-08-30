@@ -6,9 +6,9 @@ The Azure Enterprise DevOps Platform uses Azure DevOps YAML pipelines to impleme
 
 The delivery architecture separates Continuous Integration from Continuous Deployment.
 
-The CI pipeline is responsible for validating source code, scanning the repository, building the container image, scanning the resulting image, publishing security evidence, and pushing an approved artifact to Azure Container Registry.
+The CI pipeline is responsible for validating application source, scanning the repository, building and scanning the container image, publishing the image to Azure Container Registry, resolving its immutable digest, signing the digest with Notation using an Azure Key Vault-backed signing key, verifying the signed artifact, and publishing machine-readable security evidence.
 
-The CD pipeline is responsible for promoting that validated container artifact through Development, Staging, and Production.
+The CD pipeline consumes CI-produced image metadata, independently verifies the signed artifact, and promotes the same immutable image digest through Development, Staging, and Production.
 
 The overall delivery flow is:
 
@@ -26,13 +26,22 @@ Azure DevOps CI
      |
      +--> Trivy Image Scan
      |
-     +--> Security Artifacts
+     +--> Push Image to ACR
      |
-     v
-Azure Container Registry
+     +--> Resolve Immutable Image Digest
+     |
+     +--> Sign Digest with Notation
+     |
+     +--> Verify Signed Artifact
+     |
+     +--> Publish Security Evidence
      |
      v
 Azure DevOps CD
+     |
+     +--> Validate CI Image Metadata
+     |
+     +--> Verify Signed Artifact
      |
      +--> Development
      |
@@ -115,20 +124,30 @@ Repository
 Application Validation
     |
     v
-Filesystem Security Scan
+Trivy Filesystem Scan
     |
     v
 Docker Build
     |
     v
-Container Image Security Scan
+Trivy Image Scan
     |
     v
-Security Evidence
+Push Image to ACR
     |
     v
-Azure Container Registry
+Resolve Immutable Image Digest
+    |
+    v
+Notation Signing
+    |
+    v
+Signature Verification
+    |
+    v
+Security Evidence / Image Metadata
 ```
+
 
 The individual stages solve different delivery risks.
 
@@ -142,19 +161,42 @@ The reusable validation logic is located in:
 
 ```text
 pipelines/templates/python-validate.yml
+
+The validation stage prepares an isolated Python environment and verifies that the application source can be successfully compiled before later CI stages execute.
+
+The implemented validation sequence is:
+
+```text
+Python Runtime Check
+        |
+        v
+Create Virtual Environment
+        |
+        v
+Upgrade pip
+        |
+        v
+Install Application Dependencies
+        |
+        v
+Compile Python Source
+        |
+        v
+Validation Successful
 ```
+The template performs the following checks and preparation steps:
 
-The purpose of this stage is to detect application-level problems as early as possible.
+- verifies the installed Python runtime;
+- creates an isolated Python virtual environment;
+- upgrades pip;
+- installs application dependencies from the configured requirements file;
+- validates Python source syntax and byte-code compilation using python -m compileall.
 
-Typical validation responsibilities can include:
+The pipeline uses set -euo pipefail, so a failure in dependency installation or source compilation causes the validation step to fail immediately.
 
-* dependency installation;
-* syntax verification;
-* test execution;
-* static validation;
-* application startup checks.
+This provides an early CI quality gate before container image creation and security scanning.
 
-Running these checks before the container artifact is promoted prevents basic application defects from consuming later pipeline stages.
+The current portfolio implementation focuses on dependency installation and Python compilation validation. Unit tests, integration tests, linting, and application startup tests would be natural extensions for a larger production application.
 
 ---
 
@@ -201,7 +243,7 @@ Trivy Filesystem Scan
 
 ![Azure DevOps job showing successful Trivy filesystem scan](images/security/trivy-filesystem-scan.png)
 
-*Evidence of shift-left source security validation.*
+*Demonstrates shift-left source security validation.*
 
 ---
 
@@ -280,7 +322,7 @@ Trivy Image Scan
 
 ![Azure DevOps Trivy image scan job](images/security/trivy-image-scan.png)
 
-*Evidence that the final deployable artifact is security scanned.*
+*Demonstrates the final deployable artifact is security scanned.*
 
 ---
 
@@ -321,7 +363,7 @@ Azure DevOps Pipeline Artifacts
 
 ![Azure DevOps published security artifacts containing JSON and SARIF output](images/security/security-report-artifacts.png)
 
-*Demonstrate retained security evidence.*
+*Demonstrates retained and auditable security evidence.*
 
 ---
 
@@ -366,7 +408,16 @@ The preferred model is:
 Build Once
     |
     v
-Image: version-X
+Push Image to ACR
+    |
+    v
+Resolve Immutable Digest
+    |
+    v
+Sign Digest with Notation
+    |
+    v
+sha256:<digest>
     |
     +--> Development
     |
@@ -385,7 +436,7 @@ Production Build
 
 Rebuilding separately for every environment introduces the possibility that Production receives an artifact that differs from the one tested in Staging.
 
-Artifact promotion therefore improves release consistency.
+Digest-based promotion ensures that Development, Staging, and Production reference the same immutable container artifact rather than independently rebuilt or mutable tag-only artifacts.
 
 ---
 
@@ -446,38 +497,27 @@ Without reusable templates, every environment would require duplicated deploymen
 
 # Kubernetes Deployment Model
 
-The CD pipeline deploys Kubernetes configuration using the repository's Kustomize-based environment structure.
+The CD pipeline deploys Kubernetes configuration using reusable base resources together with explicit environment-specific configuration where required.
 
 ```text
 kubernetes/
 ├── base/
 │   └── application/
 │
-└── overlays/
-    ├── dev/
-    ├── staging/
-    └── prod/
+├── overlays/
+│   ├── staging/
+│   └── prod/
+│
+└── platform/
+    ├── key-vault-csi/
+    └── workload-identity/
 ```
 
-The base contains common application configuration.
+Development consumes the reusable application base together with shared platform resources.
 
-Overlays provide environment-specific changes.
+Staging and Production use explicit environment-specific overlays containing their Namespace, ServiceAccount, SecretProviderClass, Deployment, Service, HPA, and Kustomize configuration.
 
-The deployment model is therefore:
-
-```text
-Common Kubernetes Base
-          |
-          +-------------------+
-          |                   |
-          v                   v
-      Dev Overlay        Staging Overlay
-                              |
-                              v
-                         Production Overlay
-```
-
-This model reduces repeated manifests while preserving environment-specific configuration.
+The environments are logically separated through Azure DevOps environments, Kubernetes namespaces, environment-specific ServiceAccounts, federated identity credentials, and controlled CI/CD promotion.
 
 ---
 
@@ -498,7 +538,7 @@ The deployment should fail immediately if the workload cannot successfully reach
 
 ![Successful Development deployment stage](images/pipelines/cd-dev-success.png)
 
-*Evidence of automatic lower-environment deployment.*
+*Demonstrates automatic lower-environment deployment.*
 
 ---
 
@@ -520,7 +560,7 @@ Staging allows validation of:
 
 ![Successful Staging deployment stage](images/pipelines/cd-staging-success.png)
 
-*Evidence of controlled application promotion.*
+*Demonstrates controlled application promotion.*
 
 ---
 
@@ -562,7 +602,7 @@ Examples in a real enterprise environment could include:
 
 ![Azure DevOps Production environment approval/check](images/pipelines/cd-production-approval.png)
 
-*Demonstrate release governance.*
+*Demonstrates Production release governance.*
 
 ---
 
@@ -576,7 +616,7 @@ The production stage represents the final destination in the application's deliv
 
 ![Successful Production deployment stage](images/pipelines/cd-prod-success.png)
 
-*Evidence of complete Dev -> Staging -> Production delivery.*
+*Demonstrates complete Dev -> Staging -> Production delivery.*
 
 ---
 
@@ -621,13 +661,16 @@ AKS
 └── Production
 ```
 
-The environments are separated using:
+The environments are logically separated through a combination of:
+>
+> * Kubernetes namespaces;
+> * Azure DevOps environments;
+> * environment-specific Kubernetes configuration;
+> * environment-specific ServiceAccounts;
+> * federated identity credentials;
+> * controlled CI/CD promotion.
 
-* namespaces;
-* Kustomize overlays;
-* ServiceAccounts;
-* environment-specific federated identity relationships;
-* Azure DevOps deployment stages.
+> Development uses the reusable application base and shared platform resources, while Staging and Production use explicit environment-specific Kustomize overlays.
 
 This implementation provides logical environment isolation while remaining cost-efficient for a portfolio platform.
 
@@ -858,21 +901,33 @@ Deployment
 Environment
 ```
 
-Container image tagging and pipeline metadata should allow engineers to determine exactly which code revision is running in an environment.
+Immutable image digests, pipeline metadata, and source revision information provide the basis for tracing a deployed artifact back through its CI/CD lifecycle.
 
-This is especially important for:
+Then show:
 
-* incident response;
-* rollback;
-* auditing;
-* vulnerability remediation;
-* release tracking.
-
+```text
+Source Commit
+      |
+      v
+CI Pipeline Run
+      |
+      v
+ACR Image Digest
+      |
+      v
+Notation Signature
+      |
+      v
+CD Pipeline Run
+      |
+      v
+AKS Environment
+```
 ---
 
 # Rollback Strategy
 
-The preferred rollback model is artifact-based.
+The intended rollback model is artifact-based, using a previously validated immutable image digest retained in ACR.
 
 Because previous image versions remain available in the container registry, a problematic release can be replaced with a previously validated image.
 
@@ -883,7 +938,7 @@ Production
    |
    | New release unhealthy
    v
-Select Previous Trusted Image
+Select Previous Validated Image Digest
    |
    v
 Redeploy
@@ -905,28 +960,47 @@ The appropriate strategy depends on application criticality and traffic architec
 
 # Supply Chain Security
 
-The repository contains pipeline templates associated with Notation:
+The CI/CD implementation includes container artifact signing and verification using Notation.
+
+The relevant reusable templates are:
 
 ```text
-notation-sign-verify.yml
-notation-verify.yml
+pipelines/templates/notation-sign-verify.yml
+pipelines/templates/notation-verify.yml
 ```
+The CI pipeline resolves the immutable ACR image digest and signs that artifact using Notation with an Azure Key Vault-backed signing key.
 
-These represent container artifact signing and verification capabilities in the delivery architecture.
+The signing flow is:
 
-Image signing can strengthen software supply-chain security by allowing deployment systems to verify that an artifact:
+```text
+Container Image
+      |
+      v
+Push to ACR
+      |
+      v
+Resolve Immutable Digest
+      |
+      v
+Notation Signing
+      |
+      v
+Signed ACR Artifact
+      |
+      v
+Signature Verification
+```
+The CD pipeline independently verifies the signed artifact before deployment.
 
-* came from an approved build process;
-* has not been unexpectedly replaced;
-* has an associated trusted signature.
+This provides an artifact-integrity and authenticity control in addition to vulnerability scanning. Deployment therefore operates on an immutable, signed image reference rather than relying solely on a mutable container tag.
 
-A mature production implementation could extend this further through:
+The implementation could be extended further in a production environment through:
 
-* Software Bill of Materials generation;
-* SLSA-aligned build provenance;
-* artifact attestations;
-* mandatory signature verification;
-* policy enforcement at Kubernetes admission time.
+> - Software Bill of Materials generation;
+> - SLSA-aligned build provenance;
+> - artifact attestations;
+> - Kubernetes admission-time signature enforcement;
+> - organization-wide artifact trust policies.
 
 ---
 
@@ -969,25 +1043,34 @@ Azure DevOps CI
       |
       +--> Trivy Image Scan
       |
-      +--> Publish JSON/SARIF
+      +--> Push Image to ACR
       |
-      v
-Azure Container Registry
+      +--> Resolve Immutable Image Digest
+      |
+      +--> Sign Digest with Notation
+      |
+      +--> Verify Signed Artifact
+      |
+      +--> Publish JSON / SARIF Security Evidence
       |
       v
 Azure DevOps CD
       |
-      +--> Development
+      +--> Validate CI Image Metadata
       |
-      +--> Runtime Validation
+      +--> Verify Signed Artifact
       |
-      +--> Staging
+      +--> Deploy Development
       |
-      +--> Runtime Validation
+      +--> Validate Development
+      |
+      +--> Deploy Staging
+      |
+      +--> Validate Staging
       |
       +--> Production Approval
       |
-      +--> Production
+      +--> Deploy Production
       |
       v
 Azure Kubernetes Service
@@ -997,7 +1080,6 @@ Azure Kubernetes Service
       +--> HPA
       +--> Azure Monitor
 ```
-
 ---
 
 # Evidence to Capture

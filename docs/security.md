@@ -109,39 +109,47 @@ Layer 1
 Source Repository
     |
     +--> .gitignore
-    +--> Source scanning
+    +--> Trivy filesystem scanning
     |
 Layer 2
 CI Pipeline
     |
-    +--> Security gates
-    +--> Security reports
+    +--> Enforced security gates
+    +--> JSON / SARIF evidence
+    +--> CycloneDX SBOM
     |
 Layer 3
 Container Artifact
     |
-    +--> Image scanning
+    +--> Trivy image scanning
     +--> Private ACR
+    +--> Immutable image digest
+    +--> Notation signing
+    +--> Signature verification
     |
 Layer 4
 Kubernetes Runtime
     |
-    +--> Non-root containers
-    +--> SecurityContext
+    +--> Non-root execution
+    +--> privileged: false
+    +--> No privilege escalation
+    +--> Read-only root filesystem
+    +--> Drop ALL Linux capabilities
+    +--> RuntimeDefault seccomp
     |
 Layer 5
 Cloud Identity
     |
     +--> Managed Identity
     +--> OIDC
-    +--> Federated Credentials
-    +--> RBAC
+    +--> Federated Identity Credentials
+    +--> Azure RBAC
     |
 Layer 6
 Secrets
     |
     +--> Azure Key Vault
-    +--> CSI integration
+    +--> Secrets Store CSI integration
     |
 Layer 7
 Infrastructure
@@ -150,9 +158,6 @@ Infrastructure
     +--> Remote state
     +--> Backend network restrictions
 ```
-
-A failure or compromise at one layer should not automatically bypass every other security layer.
-
 ---
 
 # Shift-Left Security
@@ -181,7 +186,7 @@ CI Pipeline
       +--> Trivy Image Scan
       |
       v
-Trusted Artifact
+Security-Validated Container Artifact
 ```
 
 This reduces the cost and operational risk associated with identifying vulnerabilities after deployment.
@@ -198,13 +203,20 @@ The implementation is defined through the reusable pipeline template:
 pipelines/templates/trivy-filesystem-scan.yml
 ```
 
-Filesystem scanning provides visibility into risks such as:
+Filesystem scanning evaluates three security categories:
 
-* vulnerable application dependencies;
-* dependency metadata;
-* security misconfiguration;
-* exposed secret patterns where supported;
-* Infrastructure as Code issues.
+* known vulnerabilities in supported application dependencies and packages;
+* infrastructure and configuration misconfigurations;
+* exposed secret patterns detected by Trivy.
+
+The scan is configured with:
+
+```text
+Scanners: vuln, misconfig, secret
+Severity: HIGH, CRITICAL
+Ignore unfixed findings: enabled
+```
+Terraform state files, Terraform plan files, and .terraform working directories are deliberately excluded from the scan because they are generated or sensitive operational artifacts rather than source-controlled application configuration.
 
 The scan is integrated into CI so results influence the delivery process rather than being performed manually.
 
@@ -227,7 +239,7 @@ Trivy Filesystem Scan
 
 ![Successful Trivy filesystem scan in Azure DevOps](images/security/trivy-filesystem-scan.png)
 
-*Demonstrate source-level security validation.*
+*Demonstrates source-level security validation.*
 
 ---
 
@@ -240,69 +252,84 @@ The reusable pipeline implementation is:
 ```text
 pipelines/templates/trivy-image-scan.yml
 ```
+Image scanning is necessary even when source scanning has already passed because the final container artifact can introduce vulnerabilities through:
 
-Image scanning is necessary even when source scanning has already passed.
+- base operating-system packages;
+- package-manager installations;
+- transitive dependencies;
+- binaries copied into the image;
+- runtime components introduced during the build.
 
-A container image can introduce additional vulnerabilities through:
-
-* base operating-system packages;
-* package-manager installations;
-* transitive dependencies;
-* binaries copied into the image;
-* runtime components introduced during the build.
-
-The security flow is therefore:
+The implemented image scan evaluates vulnerabilities using the following default policy:
 
 ```text
-Source Scan
-     |
-     v
-Docker Build
-     |
-     v
-Image Scan
-     |
-     v
-Approved Container Artifact
+Scanner: vuln
+Severity: HIGH, CRITICAL
+Ignore unfixed findings: enabled
+Failure behavior: exit code 1
 ```
+The pipeline also generates:
+
+- JSON vulnerability report;
+- SARIF vulnerability report;
+- CycloneDX Software Bill of Materials (SBOM).
+
+The implemented flow is:
+```text
+Docker Image
+     |
+     v
+Trivy Vulnerability Scan
+     |
+     +--> JSON Report
+     |
+     +--> SARIF Report
+     |
+     +--> CycloneDX SBOM
+     |
+     v
+HIGH / CRITICAL Gate
+     |
+     +--> Policy Satisfied
+     |        |
+     |        v
+     |   Continue Pipeline
+     |
+     +--> Policy Violated
+              |
+              v
+         Exit Code 1
+              |
+              v
+         Fail Pipeline
+```
+The report publication task uses condition: always(), so image-security evidence is retained even when the vulnerability gate fails.
+
+Demonstrates vulnerability validation of the final deployable container artifact.
 
 ![Successful Trivy container image scan](images/security/trivy-image-scan.png)
 
-*Demonstrate security validation of the actual deployable artifact.*
+*Demonstrates security validation of the actual deployable artifact.*
 
 ---
 
 # Security Gates
 
-Security scanning is designed to function as a gate rather than only as informational logging.
+Trivy scanning is implemented as an enforced CI security control rather than informational reporting only.
 
-The desired behavior is:
+Two separate security gates are applied.
+
+## Filesystem Security Gate
+
+The filesystem scan evaluates:
 
 ```text
-Security Scan
-      |
-      +--> Allowed Severity
-      |        |
-      |        v
-      |    Continue
-      |
-      +--> Disallowed Vulnerability
-               |
-               v
-          Fail Pipeline
+Scanners: vuln, misconfig, secret
+Severity: HIGH, CRITICAL
+Ignore unfixed findings: enabled
+Failure behavior: exit code 1
 ```
-
-This establishes a policy boundary between vulnerable code and downstream deployment stages.
-
-The exact vulnerability threshold should be determined according to:
-
-* organizational risk appetite;
-* application criticality;
-* exploitability;
-* compensating controls;
-* remediation availability.
-
-In a production environment, exceptions should be explicitly approved and time-bound rather than silently ignored.
+This evaluates supported vulnerabilities, configuration misconfigurations, and exposed-secret patterns in repository content.
 
 ---
 
@@ -310,39 +337,50 @@ In a production environment, exceptions should be explicitly approved and time-b
 
 Security results are retained as Azure DevOps pipeline artifacts.
 
-The project publishes reports in formats including:
+The filesystem scan produces:
 
-* JSON;
-* SARIF.
+* JSON security report;
+* SARIF security report.
 
-The security evidence path is:
+The container image scan produces:
+
+* JSON vulnerability report;
+* SARIF vulnerability report;
+* CycloneDX Software Bill of Materials (SBOM).
+
+The evidence flow is:
 
 ```text
-Trivy
- |
- +--> Console Output
- |
- +--> JSON
- |
- +--> SARIF
-       |
-       v
+Trivy Filesystem Scan
+        |
+        +--> JSON
+        +--> SARIF
+
+Trivy Image Scan
+        |
+        +--> JSON
+        +--> SARIF
+        +--> CycloneDX SBOM
+                |
+                v
 Azure DevOps Pipeline Artifacts
 ```
+This preserves machine-readable security evidence beyond the lifetime of the individual pipeline console log.
 
-This makes security findings available after pipeline execution.
+Retained evidence supports:
 
-It also improves:
+- auditability;
+- troubleshooting;
+- vulnerability investigation;
+- historical comparison;
+- software inventory analysis;
+- integration with downstream security tooling.
 
-* auditability;
-* troubleshooting;
-* vulnerability investigation;
-* historical analysis;
-* integration with security systems.
+Because the artifact-publication steps use condition: always(), reports remain available even when a Trivy security gate fails.
 
-![Azure DevOps pipeline artifacts containing JSON and SARIF reports](images/security/security-report-artifacts.png)
+Azure DevOps pipeline artifacts containing JSON and SARIF reports.
 
-*Demonstrate retained and auditable security evidence.*
+*Demonstrates retained and auditable security evidence.*
 
 ---
 
@@ -382,10 +420,10 @@ The access relationship is based on Azure RBAC.
 Conceptually:
 
 ```text
-AKS Identity
-      |
-      | AcrPull
-      v
+AKS Kubelet Identity
+        |
+        | AcrPull
+        v
 Azure Container Registry
 ```
 
@@ -546,7 +584,7 @@ Environment-aware federation prevents unrelated Kubernetes identities from autom
 
 ![Azure Managed Identity federated credentials for Dev/Staging/Prod](images/security/workload-identity-federation.png)
 
-*Demonstrate environment-aware secretless authentication.*
+*Demonstrates environment-aware secretless authentication.*
 
 ---
 
@@ -602,7 +640,7 @@ Key Vault provides centralized secret storage together with Azure identity and a
 
 ![Azure Key Vault overview or secret inventory with secret values completely hidden](images/security/key-vault-overview.png)
 
-*Demonstrate centralized secrets management.*
+*Demonstrates centralized secrets management.*
 
 ---
 
@@ -657,7 +695,7 @@ This allows Kubernetes workloads to consume external secret material while Azure
 
 ![SecretProviderClass and successful pod secret mounting/reference](images/security/key-vault-csi.png)
 
-*Demonstrate AKS-to-Key-Vault secrets integration.*
+*Demonstrates AKS-to-Key-Vault secrets integration.*
 
 ---
 
@@ -718,33 +756,79 @@ The second model removes the persistent application credential.
 
 # Kubernetes Workload Hardening
 
-Application Deployments are configured with explicit Kubernetes SecurityContext controls.
+Application workloads are deployed with explicit Kubernetes pod-level and container-level `securityContext` controls.
 
-The objective is to reduce unnecessary container privileges.
+The implementation applies runtime hardening through the reusable application base and the explicit Staging and Production deployment configurations.
 
-Controls implemented include non-root execution and related runtime restrictions.
+Implemented pod-level controls include:
 
-A hardened workload should avoid assumptions such as:
+* `runAsNonRoot: true`;
+* `runAsUser: 10001`;
+* `runAsGroup: 10001`;
+* `fsGroup: 10001`;
+* `seccompProfile.type: RuntimeDefault`.
+
+Implemented container-level controls include:
+
+* `privileged: false`;
+* `allowPrivilegeEscalation: false`;
+* `readOnlyRootFilesystem: true`;
+* `runAsNonRoot: true`;
+* `runAsUser: 10001`;
+* `runAsGroup: 10001`;
+* `capabilities.drop: ALL`.
+
+The implemented runtime-security model is:
 
 ```text
-Container must run as UID 0
-Container requires privilege escalation
-Container requires host-level access
+Application Pod
+      |
+      +--> runAsNonRoot: true
+      +--> runAsUser: 10001
+      +--> runAsGroup: 10001
+      +--> fsGroup: 10001
+      +--> seccompProfile: RuntimeDefault
+      |
+      v
+Application Container
+      |
+      +--> privileged: false
+      +--> allowPrivilegeEscalation: false
+      +--> readOnlyRootFilesystem: true
+      +--> runAsNonRoot: true
+      +--> runAsUser: 10001
+      +--> runAsGroup: 10001
+      +--> capabilities.drop: ALL
 ```
+These controls reduce the privileges available to the workload if the application process is compromised and limit the runtime attack surface.
 
-Unless there is a strong technical requirement, application containers should operate with the minimum required privilege.
+The configuration is implemented in:
 
-![Kubernetes Deployment/securityContext showing hardened non-root configuration](images/security/kubernetes-security-context.png)
-
-*Demonstrate workload-level runtime hardening.*
+```text
+kubernetes/base/application/deployment.yaml
+kubernetes/overlays/staging/deployment.yaml
+kubernetes/overlays/prod/deployment.yaml
+```
+Demonstrates workload-level runtime hardening.
 
 ---
 
 # Non-Root Container Execution
 
-Running containers as root increases the impact of application compromise.
+Application containers are explicitly configured to execute as a non-root Linux user and group.
 
-The platform therefore applies non-root security configuration.
+The manifests enforce:
+
+```yaml
+runAsNonRoot: true
+runAsUser: 10001
+runAsGroup: 10001
+```
+The pod-level security context also defines:
+```
+fsGroup: 10001
+```
+This provides explicit runtime identity constraints rather than relying only on assumptions made by the container image.
 
 The security principle is:
 
@@ -752,60 +836,79 @@ The security principle is:
 Application Compromise
         |
         v
-Limited Container Privilege
+Non-Root Process
+        |
+        v
+Reduced Linux Privilege
         |
         v
 Reduced Blast Radius
 ```
-
-Non-root execution does not remove every container security risk, but it is an important defense-in-depth control.
+Non-root execution does not eliminate container-security risk, but it reduces the privileges available to a compromised application process.
 
 ---
 
-# Privilege Escalation
+# Container Runtime Restrictions
 
-Where supported by the workload, containers should prevent privilege escalation.
+The application container applies multiple additional runtime restrictions.
 
-This helps ensure that a process cannot gain additional Linux privileges beyond its intended execution context.
-
-A mature Kubernetes SecurityContext may include controls such as:
+The implemented container `securityContext` includes:
 
 ```yaml
 securityContext:
+  privileged: false
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  capabilities:
+    drop:
+      - ALL
 ```
+The pod-level security context also enforces:
 
-Additional controls can include:
+```
+seccompProfile:
+  type: RuntimeDefault
+```
+These controls address different runtime risks:
 
-* dropping Linux capabilities;
-* read-only root filesystem;
-* seccomp profiles;
-* explicit UID/GID configuration.
+- privileged: false prevents execution as a privileged container;
+- allowPrivilegeEscalation: false prevents the application process from acquiring additional privileges;
+- readOnlyRootFilesystem: true prevents modification of the container root filesystem at runtime;
+- capabilities.drop: ALL removes all Linux capabilities unless explicitly reintroduced;
+- seccompProfile.type: RuntimeDefault applies the runtime's default seccomp filtering profile;
+- explicit non-root UID and GID settings prevent execution as root.
 
-The appropriate controls depend on application requirements.
+Together, these controls implement defense in depth at the Kubernetes runtime layer rather than relying on a single hardening mechanism.
 
 ---
 
 # Kubernetes Environment Isolation
 
-The project models:
+The project models three logical application environments:
 
 * Development;
 * Staging;
 * Production.
 
-Environment separation includes:
+The environments are logically separated through a combination of:
 
 * Kubernetes namespaces;
-* Kustomize overlays;
+* Azure DevOps environments;
+* environment-specific Kubernetes configuration;
 * environment-specific ServiceAccounts;
-* federated identity relationships;
-* deployment pipeline stages.
+* federated identity credentials;
+* controlled deployment stages.
 
-This provides logical isolation within the shared portfolio AKS cluster.
+Development consumes the reusable application base together with shared platform resources.
 
-For a production system with stronger isolation requirements, separate clusters or Azure subscriptions may be more appropriate.
+Staging and Production use explicit environment-specific Kustomize overlays.
+
+This provides logical isolation within the shared portfolio AKS platform while avoiding the cost and operational complexity of three independent clusters.
+
+For production systems with stronger security or regulatory isolation requirements, dedicated AKS clusters, Azure subscriptions, VNets, identities, Key Vault instances, and deployment service connections may be more appropriate.
 
 ---
 
@@ -825,12 +928,12 @@ AKS Identity
 ```
 
 ```text
-AKS
- |
- +--> AcrPull
+AKS Kubelet Identity
         |
-        v
-       ACR
+        +--> AcrPull
+                |
+                v
+               ACR
 ```
 
 ```text
@@ -857,7 +960,7 @@ Examples:
 | Identity                         | Required Responsibility                  |
 | -------------------------------- | ---------------------------------------- |
 | AKS control-plane identity       | AKS infrastructure operations            |
-| AKS image-pull identity          | Pull images from ACR                     |
+| AKS kubelet identity             | Pull application images from ACR         |
 | Application workload identity    | Retrieve required Key Vault secrets      |
 | Azure DevOps deployment identity | Perform authorized deployment operations |
 
@@ -998,7 +1101,7 @@ This materially reduces unnecessary exposure of sensitive Terraform state infras
 
 ![Terraform backend storage networking showing default Deny and authorized access without exposing sensitive identifiers](images/security/terraform-backend-networking.png)
 
-*Demonstrate Terraform backend network hardening.*
+*Demonstrates Terraform backend network hardening.*
 
 ---
 
@@ -1150,54 +1253,74 @@ Production Authorization
 Production Deployment
 ```
 
-This supports separation of duties and reduces the risk of an unintended automatic production release.
+This creates an explicit Production authorization boundary and can support separation of duties when approval permissions are assigned independently from deployment permissions. It also reduces the risk of an unintended automatic Production release.
 
 ---
 
 # Software Supply Chain Security
 
-The pipeline includes templates associated with Notation signing and verification:
+The CI/CD implementation includes container artifact signing and verification using Notation.
+
+The relevant reusable templates are:
 
 ```text
-notation-sign-verify.yml
-notation-verify.yml
+pipelines/templates/notation-sign-verify.yml
+pipelines/templates/notation-verify.yml
 ```
+After the container image is pushed to Azure Container Registry, the CI pipeline resolves the immutable image digest and signs that digest using Notation with an Azure Key Vault-backed signing key.
 
-Artifact signing helps establish trust in the software supply chain.
-
-The intended trust model is:
+The implemented artifact-signing and verification flow is:
 
 ```text
-Approved Build
-     |
-     v
-Signed Artifact
-     |
-     v
-Signature Verification
-     |
-     v
-Deployment
+Validated Container Image
+        |
+        v
+Push to ACR
+        |
+        v
+Resolve Immutable Image Digest
+        |
+        v
+Sign Digest with Notation
+        |
+        v
+Verify Signature
+        |
+        v
+Signed ACR Artifact
+        |
+        v
+CD Signature Verification
+        |
+        v
+AKS Deployment
 ```
+The CD pipeline independently verifies the signed artifact before deployment.
 
-This can help verify that an artifact originated from an approved process and was not unexpectedly replaced.
+This provides artifact integrity and authenticity controls in addition to vulnerability scanning.
+
+Deployment therefore operates on an immutable, signed image reference rather than relying solely on a mutable container tag.
+
+The image-security pipeline also generates a CycloneDX SBOM for the built container artifact.
+
+The current implementation does not claim signed SBOMs, SLSA build provenance, OCI attestations, or Kubernetes admission-time signature enforcement. Those remain potential production enhancements.
 
 ---
 
 # Additional Supply Chain Improvements
 
-A mature enterprise implementation could further include:
+A mature enterprise implementation could extend the existing software supply-chain controls through:
 
-* Software Bill of Materials generation;
 * signed SBOMs;
-* build provenance;
-* SLSA-aligned controls;
+* SLSA-aligned build provenance;
 * OCI attestations;
+* provenance and attestation verification;
 * mandatory image-signature enforcement;
-* admission-control verification;
-* dependency provenance validation.
+* Kubernetes admission-time signature verification;
+* dependency provenance validation;
+* organization-wide artifact trust policies.
 
-These controls become increasingly important for regulated or high-risk software supply chains.
+These controls become increasingly important for regulated, high-risk, or large-scale software supply chains.
 
 ---
 
@@ -1318,20 +1441,20 @@ The final running environment should be validated against the following controls
 
 ---
 
-# Evidence to Capture
+# Security Implementation Evidence
 
-The final repository should contain security evidence for:
+The repository contains implementation evidence for the major security controls described in this document, including:
 
 1. Trivy filesystem scanning;
-2. Trivy image scanning;
-3. JSON/SARIF report publication;
+2. Trivy container-image scanning;
+3. JSON and SARIF security report publication;
 4. Workload Identity federation;
-5. Key Vault integration;
+5. Azure Key Vault integration;
 6. SecretProviderClass configuration;
-7. Kubernetes SecurityContext;
+7. Kubernetes SecurityContext hardening;
 8. Terraform backend network restrictions.
 
-The screenshots must never expose:
+Published screenshots and documentation are intentionally selected to avoid exposing:
 
 * passwords;
 * tokens;
@@ -1351,7 +1474,7 @@ A more heavily regulated or production-critical implementation could add:
 * Azure Private Link;
 * private ACR access;
 * private Key Vault access;
-* Azure Firewall;
+* Azure Firewall or equivalent centralized egress control;
 * Network Security Groups;
 * Kubernetes NetworkPolicies;
 * Azure Policy for AKS;
@@ -1361,20 +1484,18 @@ A more heavily regulated or production-critical implementation could add:
 * Microsoft Defender for Cloud;
 * Microsoft Sentinel;
 * Pod Security Admission;
-* seccomp enforcement;
-* read-only root filesystems;
-* Linux capability dropping;
-* dedicated production clusters;
-* dedicated subscriptions;
-* privileged access management;
+* dedicated Production clusters;
+* dedicated Azure subscriptions;
+* Privileged Identity Management;
 * just-in-time administrative access;
 * ephemeral CI/CD agents;
-* signed container enforcement;
-* SBOM generation;
-* SLSA provenance;
-* secret rotation automation.
+* dedicated Production agent pools;
+* Kubernetes admission-time signature enforcement;
+* signed SBOMs and attestation workflows;
+* SLSA-aligned build provenance;
+* automated secret rotation.
 
-The correct controls should be determined by threat model, business risk, regulatory requirements, application criticality, and cost.
+The appropriate controls should be selected according to threat model, business risk, regulatory requirements, application criticality, recovery objectives, operational maturity, and cost.
 
 ---
 

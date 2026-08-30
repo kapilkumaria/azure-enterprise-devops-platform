@@ -14,17 +14,23 @@ The Azure Enterprise DevOps Platform is designed as a production-oriented cloud-
 The architecture combines:
 
 * Microsoft Azure
-* Azure DevOps
+* Azure DevOps YAML Pipelines
 * Terraform
 * Azure Kubernetes Service
+* Kubernetes
 * Azure Container Registry
-* Azure Key Vault
-* Microsoft Entra Workload Identity
+* Docker
 * Kustomize
 * Trivy
+* Notation
+* Azure Key Vault
+* Microsoft Entra Workload Identity
+* OIDC federation
 * Azure Monitor
+* Container Insights
 * Log Analytics
-* self-hosted Azure DevOps agents
+* Azure Monitor alerting
+* self-hosted Azure DevOps agents running on AWS EC2
 
 The platform separates infrastructure provisioning, application delivery, identity, security, secrets management, and observability into distinct architectural concerns.
 
@@ -63,42 +69,55 @@ Developer
 Git Repository
    |
    v
-Azure DevOps
+Azure DevOps CI
    |
-   +-------------------------------+
-   |                               |
-   v                               v
-CI Pipeline                    CD Pipeline
-   |                               |
-   |                               |
-   +--> Validate                    +--> Dev
-   +--> Trivy FS Scan               |
-   +--> Docker Build                +--> Staging
-   +--> Trivy Image Scan            |
-   +--> Publish Reports             +--> Production Approval
-   |                               |
-   v                               +--> Production
-Azure Container Registry            |
-   |                               |
-   +---------------+---------------+
-                   |
-                   v
-          Azure Kubernetes Service
-                   |
-        +----------+-----------+
-        |          |           |
-        v          v           v
-      Dev       Staging       Prod
-        |
-        +-----------------------------+
-        |                             |
-        v                             v
-Workload Identity                Azure Monitor
-        |
-        v
-Azure Key Vault
+   +--> Application Validation
+   |
+   +--> Trivy Filesystem Scan
+   |
+   +--> Docker Image Build
+   |
+   +--> Trivy Image Scan
+   |
+   +--> Push Image to ACR
+   |
+   +--> Resolve Immutable Image Digest
+   |
+   +--> Sign Digest with Notation
+   |
+   +--> Verify Signed Artifact
+   |
+   +--> Publish JSON / SARIF Security Evidence
+   |
+   v
+Azure Container Registry
+   |
+   | Signed immutable image digest
+   v
+Azure DevOps CD
+   |
+   +--> Validate Image Metadata
+   |
+   +--> Verify Artifact Signature
+   |
+   +--> Development
+   |
+   +--> Staging
+   |
+   +--> Production Approval
+   |
+   +--> Production
+   |
+   v
+Azure Kubernetes Service
+   |
+   +--> Workload Identity
+   +--> Azure Key Vault CSI
+   +--> Horizontal Pod Autoscaler
+   +--> Container Insights
+   +--> Log Analytics
+   +--> Azure Monitor Alerting
 ```
-
 ---
 
 # Platform Boundaries
@@ -113,12 +132,17 @@ Responsibilities include:
 
 * source-triggered CI execution;
 * application validation;
-* vulnerability scanning;
+* filesystem and container-image vulnerability scanning;
 * container image creation;
-* image publication;
+* image publication to Azure Container Registry;
+* immutable image digest resolution;
+* Notation artifact signing;
+* artifact signature verification;
+* JSON and SARIF security evidence publication;
 * deployment orchestration;
-* environment promotion;
-* production approval.
+* promotion of the same immutable artifact across environments;
+* Development and Staging validation;
+* Production approval and governance.
 
 The pipeline implementation is stored as code in the repository.
 
@@ -355,25 +379,28 @@ Staging
  v
 Production
 ```
+The environments are separated through a combination of:
 
-These environments are represented through Kubernetes namespaces and Kustomize overlays.
+- Kubernetes namespaces;
+- Azure DevOps environments;
+- environment-specific ServiceAccounts;
+- federated identity credentials;
+- Kubernetes configuration;
+- controlled CI/CD promotion.
 
-The repository contains:
+The implemented Kubernetes configuration deliberately does not use three identical overlay structures.
 
-```text
-kubernetes/overlays/
-├── dev
-├── staging
-└── prod
-```
+Development uses the reusable application base together with shared platform resources.
 
-Environment-specific configuration can differ while the common application definition remains reusable.
+Staging and Production use explicit environment-specific overlays containing their Namespace, ServiceAccount, SecretProviderClass, Deployment, Service, HPA, and Kustomize configuration.
+
+This provides environment-aware configuration while avoiding unnecessary duplication.
 
 ---
 
 # Kubernetes Configuration Architecture
 
-The Kubernetes configuration follows a base-and-overlay pattern.
+The Kubernetes configuration uses reusable base resources together with environment-specific configuration where required.
 
 ```text
 kubernetes/
@@ -384,7 +411,6 @@ kubernetes/
 |
 +-- overlays/
 |   |
-|   +-- dev/
 |   +-- staging/
 |   +-- prod/
 |
@@ -393,12 +419,7 @@ kubernetes/
     +-- key-vault-csi/
     +-- workload-identity/
 ```
-
-The base contains common application resources.
-
-Environment overlays modify or extend those resources without requiring complete copies of every Kubernetes manifest.
-
-This reduces configuration drift and duplication.
+Development consumes the reusable application base together with shared platform resources. Staging and Production use explicit environment-specific overlays.
 
 ---
 
