@@ -777,6 +777,15 @@ These include JSON and SARIF reports.
 
 *Demonstrates retained and auditable security evidence.*
 
+### Software Bill of Materials
+
+The container-image security stage also generates a CycloneDX Software Bill of Materials (SBOM), providing a machine-readable inventory of components contained in the built image.
+
+![CycloneDX SBOM published by the CI pipeline](docs/images/security/sbom-artifact.png)
+
+*Demonstrates CycloneDX SBOM generation and retention as a CI pipeline artifact.*
+
+
 ## Artifact Signing and Verification
 
 The CI pipeline captures the immutable container image digest and signs the artifact using Notation with an Azure Key Vault-backed signing key.
@@ -810,6 +819,31 @@ Publish Image Metadata
 The CD pipeline independently verifies the signed artifact before deployment.
 
 This establishes a stronger software supply-chain guarantee than deploying solely from a mutable image tag.
+
+
+### Immutable Artifact Evidence
+
+The CI pipeline resolves the pushed container image to an immutable OCI digest before signing and deployment.
+
+![CI pipeline resolving immutable OCI image digest](docs/images/security/immutable-image-digest.png)
+
+*Demonstrates resolution of the deployable ACR artifact to a `sha256` digest.*
+
+### Notation Signing Evidence
+
+The immutable image digest is signed using Notation with the configured Azure Key Vault-backed signing capability.
+
+![Successful Notation signing of immutable container image](docs/images/security/notation-signing.png)
+
+*Demonstrates successful signing of the immutable OCI artifact.*
+
+### Deployment Trust Gate
+
+The CD pipeline independently verifies the signed immutable image before allowing deployment.
+
+![Successful Notation verification before deployment](docs/images/security/notation-verification.png)
+
+*Demonstrates strict signature verification as a pre-deployment trust gate.*
 
 ## CI Pipeline Evidence
 

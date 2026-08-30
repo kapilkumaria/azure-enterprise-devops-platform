@@ -1004,6 +1004,35 @@ The implementation could be extended further in a production environment through
 
 ---
 
+
+## Supply Chain Execution Evidence
+
+The following pipeline evidence demonstrates that immutable artifact handling and signature verification are implemented controls in the delivery workflow.
+
+### Immutable Image Digest Resolution
+
+The CI workflow resolves the pushed ACR image to its immutable OCI digest.
+
+![Immutable image digest resolution in Azure DevOps](images/security/immutable-image-digest.png)
+
+*The deployable artifact is identified using an immutable `sha256` digest.*
+
+### Notation Signing
+
+The CI workflow signs that immutable digest using Notation.
+
+![Successful Notation signing](images/security/notation-signing.png)
+
+*The same immutable artifact subsequently consumed by CD is cryptographically signed.*
+
+### Pre-Deployment Signature Verification
+
+The CD workflow independently verifies the signed artifact before the deployment stages are allowed to proceed.
+
+![Successful Notation verification before deployment](images/security/notation-verification.png)
+
+*The deployment pipeline applies signature verification as a trust gate before Development promotion.*
+
 # Pipeline Observability
 
 Pipeline execution itself should be treated as an observable system.

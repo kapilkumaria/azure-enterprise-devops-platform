@@ -1307,6 +1307,43 @@ The current implementation does not claim signed SBOMs, SLSA build provenance, O
 
 ---
 
+
+## Software Supply Chain Evidence
+
+The implemented CI/CD controls are backed by captured execution evidence rather than architecture claims alone.
+
+### CycloneDX SBOM
+
+The image-security stage generates and publishes a CycloneDX SBOM for the built container artifact.
+
+![CycloneDX SBOM pipeline artifact](images/security/sbom-artifact.png)
+
+*CycloneDX software inventory retained with the CI security artifacts.*
+
+### Immutable OCI Artifact Identity
+
+After the image is pushed to Azure Container Registry, the pipeline resolves the registry manifest to its immutable `sha256` digest.
+
+![Immutable OCI image digest resolution](images/security/immutable-image-digest.png)
+
+*Immutable image identity used for signing, verification, and environment promotion.*
+
+### Notation Artifact Signing
+
+Notation signs the immutable image reference using the configured Azure Key Vault-backed signing capability.
+
+![Successful Notation artifact signing](images/security/notation-signing.png)
+
+*Successful signing of the immutable container artifact.*
+
+### Independent CD Verification
+
+The CD workflow verifies the signed digest using the configured Notation trust policy before deployment proceeds.
+
+![Notation verification deployment trust gate](images/security/notation-verification.png)
+
+*Successful strict signature verification before deployment.*
+
 # Additional Supply Chain Improvements
 
 A mature enterprise implementation could extend the existing software supply-chain controls through:
