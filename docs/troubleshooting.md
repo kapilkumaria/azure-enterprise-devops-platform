@@ -494,7 +494,7 @@ A correct command executed in the wrong environment can be more dangerous than a
 
 ## Situation
 
-Before destroying the development platform, Terraform showed:
+During one validated lifecycle run, the Development environment destroy plan reported:
 
 ```text
 Plan: 0 to add, 0 to change, 24 to destroy.
@@ -619,86 +619,90 @@ Then assign the narrowest role at the narrowest appropriate scope.
 
 ---
 
-# Issue 8 — AKS Must Be Able to Pull Images From ACR
+# Issue 8 — AKS Kubelet Identity Must Be Able to Pull Images From ACR
 
 ## Problem Domain
 
-Creating ACR and AKS does not automatically mean Kubernetes can retrieve private container images.
+Creating Azure Container Registry and AKS does not automatically guarantee that Kubernetes worker nodes can retrieve private container images.
 
-AKS needs authorization to pull from ACR.
+The AKS kubelet identity requires authorization to pull images from ACR.
 
 ---
 
 ## Required Relationship
 
 ```text
-AKS
- |
- | AcrPull
- v
-ACR
+AKS Kubelet Identity
+        |
+        | AcrPull
+        v
+Azure Container Registry
 ```
-
 ---
 
 ## Symptoms of Failure
 
-A Kubernetes pod may show:
+A Kubernetes pod may enter states such as:
 
-```text
+```
 ImagePullBackOff
 ```
-
 or:
 
-```text
-ErrImagePull
 ```
+ErrImagePull
+Investigation
+```
+Start with:
 
----
-
-## Investigation
-
-Check:
-
-```bash
+```
 kubectl describe pod <pod> -n <namespace>
 ```
-
-Then inspect:
-
-```text
-Events
-```
+Inspect the Events section.
 
 Possible causes include:
 
-* incorrect image name;
-* incorrect tag;
-* missing image;
-* ACR authentication failure;
-* missing AcrPull assignment.
+- incorrect image repository;
+- incorrect image reference;
+- missing image;
+- ACR authentication or authorization failure;
+- missing `AcrPull` role assignment;
+- registry connectivity problems.
 
----
+The Azure-side relationship can also be inspected through role assignments at the ACR scope.
+
+----
 
 ## Resolution
 
-Terraform manages the appropriate ACR pull role assignment.
+Terraform manages the required AcrPull role assignment for the AKS kubelet identity at the Azure Container Registry scope.
+
+No static Docker registry credential is embedded in the application Kubernetes manifests.
 
 ---
 
 ## Engineering Lesson
 
-`ImagePullBackOff` is a Kubernetes symptom.
+`ImagePullBackOff` is a Kubernetes symptom, not necessarily a Kubernetes root cause.
 
-The root cause may exist in:
+The complete path must be traced:
 
-* registry configuration;
-* Azure RBAC;
-* image naming;
-* CI artifact publication.
-
-Always trace the entire image path.
+```
+CI
+ |
+ v
+ACR Artifact
+ |
+ v
+Azure RBAC
+ |
+ v
+AKS Kubelet
+ |
+ v
+Kubernetes Pod
+```
+Troubleshooting should identify which boundary in that chain failed.
 
 ---
 
@@ -999,65 +1003,108 @@ Events reveal the runtime failure.
 
 ---
 
-# Issue 14 — Kubernetes SecurityContext Hardening Required Application Changes
+# Issue 14 — Kubernetes Runtime Hardening Had to Remain Application-Compatible
 
 ## Problem
 
-The project introduced stronger Kubernetes workload security controls.
+The project introduced explicit pod-level and container-level Kubernetes runtime security controls.
 
-The application workloads needed to operate correctly without unnecessary root privilege.
+Hardening the workload was not simply a matter of adding `runAsNonRoot: true`; the application image and filesystem behavior also had to remain compatible with the restricted execution model.
 
-Security hardening included explicit `securityContext` configuration and non-root execution.
+---
 
+## Implemented Pod-Level Controls
+
+```yaml
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+---
+
+## Implemented Container-Level Controls
+
+```yaml
+securityContext:
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  capabilities:
+    drop:
+      - ALL
+```
+
+The implementation is present in:
+
+```text
+kubernetes/base/application/deployment.yaml
+kubernetes/overlays/staging/deployment.yaml
+kubernetes/overlays/prod/deployment.yaml
+```
 ---
 
 ## Why This Matters
 
-A container that only works as root has a larger runtime attack surface.
+The controls address different risks:
 
-The desired model is:
-
-```text
-Application
-    |
-    v
-Non-Root Container
-    |
-    v
-Restricted Runtime Privilege
-```
+* `runAsNonRoot` prevents root execution;
+* explicit UID/GID values make runtime identity deterministic;
+* `privileged: false` prevents privileged-container execution;
+* `allowPrivilegeEscalation: false` blocks privilege escalation;
+* `readOnlyRootFilesystem: true` prevents runtime modification of the container root filesystem;
+* `capabilities.drop: ALL` removes Linux capabilities;
+* `RuntimeDefault` applies the container runtime's default seccomp filtering profile.
 
 ---
 
-## Resolution
+## Validation
 
-Deployment manifests were updated with explicit workload/container security controls.
+The workload must still become healthy after these controls are applied.
 
-Validation included ensuring that the application continued to start successfully after hardening.
+Useful checks include:
 
----
-
-## Important Lesson
-
-Security hardening must be tested.
-
-Adding:
-
-```yaml
-runAsNonRoot: true
+```bash
+kubectl rollout status deployment/<deployment> \
+  -n <namespace>
 ```
 
-does not automatically mean an arbitrary image will work.
+and:
 
-The image itself must support non-root execution.
+```bash
+kubectl get pods -n <namespace>
+```
 
+For failures:
+
+```bash
+kubectl describe pod <pod> -n <namespace>
+kubectl logs <pod> -n <namespace>
+```
 ---
 
 ## Engineering Lesson
 
-Security controls should not simply be copied into YAML.
+Runtime-security controls must be validated against the actual application.
 
-Each control must be compatible with the application and validated at runtime.
+A security configuration that prevents the workload from operating correctly is not a completed implementation.
+
+The objective is:
+
+```text
+Minimum Required Privilege
+          +
+Healthy Application Runtime
+```
+
+rather than blindly copying hardening YAML from another workload.
 
 ---
 
@@ -1181,23 +1228,59 @@ This is defense in depth.
 
 ---
 
-# Issue 17 — Security Reports Should Survive the Pipeline Run
+# Issue 17 — Security Evidence Must Survive the Pipeline Run
 
 ## Problem
 
-Security information written only to console logs is difficult to use later.
+Security findings written only to pipeline console output are difficult to investigate or audit after the job finishes.
 
-Pipeline logs are not an ideal security evidence repository.
+The final implementation therefore retains machine-readable evidence as Azure DevOps pipeline artifacts.
 
 ---
 
-## Resolution
+## Implemented Evidence
 
-Trivy reports were generated and published as pipeline artifacts in formats including:
+The filesystem security scan produces:
 
 ```text
 JSON
 SARIF
+```
+
+The container-image security scan produces:
+
+```text
+JSON
+SARIF
+CycloneDX SBOM
+```
+
+Artifact publication uses:
+
+```text
+condition: always()
+```
+
+so security evidence can still be retained when an enforced Trivy gate fails.
+
+---
+
+## Evidence Flow
+
+```text
+Trivy Filesystem Scan
+        |
+        +--> JSON
+        +--> SARIF
+
+Trivy Image Scan
+        |
+        +--> JSON
+        +--> SARIF
+        +--> CycloneDX SBOM
+                |
+                v
+      Azure DevOps Pipeline Artifacts
 ```
 
 ---
@@ -1206,63 +1289,113 @@ SARIF
 
 This provides:
 
-* audit evidence;
-* downloadable reports;
-* later investigation;
-* security-tool integration;
-* historical comparison.
+* retained security evidence;
+* later vulnerability investigation;
+* auditability;
+* historical comparison;
+* software inventory information;
+* integration potential with downstream security tooling.
 
 ---
 
 ## Engineering Lesson
 
-A mature DevSecOps pipeline should produce evidence, not merely console output.
+A mature DevSecOps pipeline should produce durable evidence, not merely console output.
+
+The distinction is:
+
+```text
+Security Scan
+     !=
+Security Evidence Lifecycle
+```
+
+Both are required for an auditable delivery process.
 
 ---
 
-# Issue 18 — Security Gates Must Fail Correctly
+# Issue 18 — Trivy Security Gates Must Actually Stop the Pipeline
 
 ## Problem Domain
 
-A vulnerability scanner that always allows the pipeline to continue is informational rather than preventative.
+Running a security scanner does not automatically create a security gate.
 
-The desired behavior is:
+If the scanner reports unacceptable findings but still exits successfully, the pipeline remains informational rather than preventative.
+
+---
+
+## Filesystem Gate
+
+The filesystem scan uses:
 
 ```text
-Trivy
- |
- +--> Acceptable findings
- |        |
- |        v
- |     Continue
- |
- +--> Policy violation
-          |
-          v
-      Fail Pipeline
+Scanners: vuln, misconfig, secret
+Severity: HIGH, CRITICAL
+Ignore unfixed findings: enabled
+Failure behavior: exit code 1
+```
+
+The gate therefore evaluates supported vulnerability, misconfiguration, and secret findings.
+
+---
+
+## Container Image Gate
+
+The image scan uses:
+
+```text
+Scanner: vuln
+Severity: HIGH, CRITICAL
+Ignore unfixed findings: enabled
+Failure behavior: exit code 1
 ```
 
 ---
 
-## Troubleshooting Approach
-
-When configuring a security gate, validate both paths:
+## Implemented Behavior
 
 ```text
-Positive Test
-Known-clean artifact should pass.
-
-Negative Test
-Known-policy-violating artifact should fail.
+Security Scan
+      |
+      +--> Policy Satisfied
+      |         |
+      |         v
+      |      Continue
+      |
+      +--> Policy Violated
+                |
+                v
+           Exit Code 1
+                |
+                v
+          Pipeline Fails
 ```
 
-Without negative testing, it is possible to believe a gate works when it never actually blocks anything.
+JSON/SARIF reports and, for the image scan, the CycloneDX SBOM are generated before the enforcement step.
+
+The publication step uses `condition: always()` so evidence can remain available when the gate blocks progression.
+
+---
+
+## Validation Principle
+
+Security controls should be validated through both successful and failing conditions where practical.
+
+A configuration existing in YAML is not sufficient evidence that it blocks an unacceptable artifact.
 
 ---
 
 ## Engineering Lesson
 
-Security controls need functional testing just like application code.
+The key DevSecOps distinction is:
+
+```text
+Scanner Installed
+        !=
+Security Gate Enforced
+```
+
+Exit behavior and pipeline control flow determine whether a security tool is preventative.
 
 ---
 
@@ -1478,40 +1611,54 @@ The fact that it is generated by a DevOps platform does not make it safe to publ
 
 ---
 
-# Issue 23 — Environment Promotion Must Use the Correct Artifact
+# Issue 23 — Environment Promotion Must Preserve Immutable Artifact Identity
 
 ## Problem Domain
 
-A multi-environment pipeline can accidentally rebuild an image separately for every environment.
+A multi-environment delivery process can accidentally rebuild an application image independently for Development, Staging, and Production.
 
-This undermines confidence that the production artifact is the same artifact tested earlier.
+It can also rely only on mutable image tags.
+
+Either approach weakens confidence that Production is running the artifact that was previously validated.
 
 ---
 
-## Preferred Model
+## Implemented Model
+
+The CI pipeline:
 
 ```text
-Build Once
-    |
-    v
-Image Version X
-    |
-    +--> Dev
-    |
-    +--> Staging
-    |
-    +--> Production
+Builds Image
+     |
+     v
+Scans Image
+     |
+     v
+Pushes to ACR
+     |
+     v
+Resolves Immutable Digest
+     |
+     v
+Signs Digest with Notation
 ```
 
+The resulting immutable artifact identity is then promoted through the deployment lifecycle.
+
+```text
+sha256:<digest>
+       |
+       +--> Development
+       |
+       +--> Staging
+       |
+       +--> Production
+```
 ---
 
-## Troubleshooting Question
+## Investigation
 
-When Dev and Production behave differently, first verify:
-
-> Are they actually running the same image digest/tag?
-
-Check:
+When environments behave differently, compare their deployed image references:
 
 ```bash
 kubectl get deployment <deployment> \
@@ -1519,11 +1666,33 @@ kubectl get deployment <deployment> \
   -o jsonpath='{.spec.template.spec.containers[*].image}'
 ```
 
+Then correlate the deployment with the CI/CD image metadata and ACR digest.
+
 ---
 
 ## Engineering Lesson
 
-Artifact identity should be traceable from source commit to production deployment.
+Artifact identity should remain traceable across the complete path:
+
+```text
+Source Revision
+      |
+      v
+CI Pipeline
+      |
+      v
+ACR Image Digest
+      |
+      v
+Notation Signature
+      |
+      v
+CD Pipeline
+      |
+      v
+AKS Environment
+```
+Build once and promote the same immutable artifact.
 
 ---
 
@@ -1572,53 +1741,68 @@ Creating an approval configuration is not sufficient if the pipeline does not ac
 
 ## Problem Domain
 
-Maintaining completely separate copies of Kubernetes manifests for Dev, Staging, and Production creates duplication.
+Maintaining independent copies of all Kubernetes manifests for Development, Staging, and Production creates duplication and increases configuration-drift risk.
 
-Duplicated configuration tends to drift.
+The implemented repository deliberately does not use three identical overlay structures.
 
 ---
 
-## Resolution
-
-The project uses a Kustomize base-and-overlay structure:
+## Implemented Configuration Model
 
 ```text
 kubernetes/
 ├── base/
 │   └── application/
-└── overlays/
-    ├── dev/
-    ├── staging/
-    └── prod/
+├── overlays/
+│   ├── dev/
+│   ├── staging/
+│   └── prod/
+└── platform/
+    ├── key-vault-csi/
+    └── workload-identity/
 ```
+
+Development consumes the reusable application base together with shared platform resources.
+
+Staging and Production use explicit environment-specific overlays containing resources such as:
+
+* Namespace;
+* ServiceAccount;
+* SecretProviderClass;
+* Deployment;
+* Service;
+* HPA;
+* Kustomize configuration.
 
 ---
 
 ## Validation
 
-Before deployment:
+For configurations represented through Kustomize, inspect rendered output before deployment.
 
-```bash
-kubectl kustomize kubernetes/overlays/dev
-```
+Examples include:
 
 ```bash
 kubectl kustomize kubernetes/overlays/staging
 ```
 
+and:
+
 ```bash
 kubectl kustomize kubernetes/overlays/prod
 ```
 
-Review the rendered manifests.
+Development should be validated according to the base/shared-platform deployment path implemented by the pipeline rather than assuming it has an identical overlay to the other environments.
 
 ---
 
 ## Engineering Lesson
 
-Validate generated configuration before applying it.
+Configuration reuse should reflect the actual environment model.
 
-Kustomize reduces duplication but does not eliminate the possibility of an incorrect patch or overlay.
+The objective is not to force every environment into an identical directory structure.
+
+The objective is to minimize duplication while making environment-specific differences explicit and reviewable.
 
 ---
 
@@ -1867,7 +2051,98 @@ Alerting should be tested with controlled failure injection rather than assumed 
 
 ---
 
-# Issue 31 — Notation Trust Certificate Versus Private Key
+# Issue 31 — Notation Signing and Verification Depend on Immutable Artifact Identity
+
+## Problem Domain
+
+Container artifact signing introduces several dependencies beyond successfully pushing an image to ACR.
+
+The signing workflow requires the correct immutable image digest, signing identity, trust material, and verification configuration to agree.
+
+---
+
+## Implemented Flow
+
+```text
+Container Image
+      |
+      v
+Push to ACR
+      |
+      v
+Resolve Immutable Digest
+      |
+      v
+Notation Signing
+      |
+      v
+Signed OCI Artifact
+      |
+      v
+Signature Verification
+      |
+      v
+Deployment Eligibility
+```
+
+---
+
+## Failure Domains
+
+Signing or verification failures can originate from:
+
+* incorrect ACR reference;
+* mutable tag used instead of the intended digest;
+* digest-resolution failure;
+* Key Vault signing-key authorization;
+* Notation plugin or CLI configuration;
+* missing or incorrect trust certificate;
+* incorrect trust policy;
+* certificate identity mismatch;
+* CD pipeline consuming an artifact different from the one signed.
+
+---
+
+## Investigation Strategy
+
+First confirm the artifact identity.
+
+The image reference should resolve to the expected:
+
+```text
+<registry>/<repository>@sha256:<digest>
+```
+
+Then validate the signing operation separately from verification.
+
+If signing succeeds but verification fails, move the investigation toward:
+
+```text
+Trust Certificate
+      |
+      v
+Trust Store
+      |
+      v
+Trust Policy
+      |
+      v
+Signed Artifact
+```
+
+Do not rebuild the image simply because signature verification fails; the failure may exist entirely in the trust configuration.
+
+---
+
+## Engineering Lesson
+
+Software supply-chain troubleshooting should preserve artifact identity.
+
+Once the immutable digest is known, investigate signing and trust configuration around that artifact rather than introducing another build and changing the object being diagnosed.
+
+---
+
+# Issue 32 — Notation Trust Certificate Versus Private Key
 
 ## Situation
 
@@ -1958,7 +2233,7 @@ Never assume based solely on the extension.
 
 ---
 
-# Issue 32 — `.gitignore` Does Not Remove Already Tracked Files
+# Issue 33 — `.gitignore` Does Not Remove Already Tracked Files
 
 ## Important Git Behavior
 
@@ -2016,7 +2291,7 @@ It is not a security cleanup mechanism for existing Git history.
 
 ---
 
-# Issue 33 — Public Portfolio Screenshots Can Leak Sensitive Information
+# Issue 34 — Public Portfolio Screenshots Can Leak Sensitive Information
 
 ## Problem Domain
 
@@ -2077,7 +2352,7 @@ A secure platform can still leak credentials through careless screenshots.
 
 ---
 
-# Issue 34 — Architecture Documentation Can Drift From Implementation
+# Issue 35 — Architecture Documentation Can Drift From Implementation
 
 ## Problem
 
@@ -2120,134 +2395,7 @@ Future-state or enterprise alternatives should be clearly labelled as improvemen
 
 ---
 
-# Issue 35 — Mermaid CLI Required a Headless Browser
-
-## Problem
-
-The architecture diagram was maintained as Mermaid source:
-
-```text
-diagrams/azure-enterprise-devops-platform.mmd
-```
-
-Mermaid CLI was installed successfully:
-
-```bash
-sudo npm install -g @mermaid-js/mermaid-cli
-```
-
-but initial rendering failed with an error indicating that `chrome-headless-shell` could not be found.
-
----
-
-## Root Cause
-
-Mermaid CLI uses Puppeteer for browser-based rendering.
-
-The CLI existed, but the required headless browser binary had not yet been installed in Puppeteer's cache.
-
----
-
-## Resolution
-
-The required browser was installed with:
-
-```bash
-npx puppeteer browsers install chrome-headless-shell
-```
-
-The browser became available under:
-
-```text
-~/.cache/puppeteer/
-```
-
-The architecture diagram could then be rendered successfully:
-
-```bash
-mmdc \
-  -i diagrams/azure-enterprise-devops-platform.mmd \
-  -o docs/images/architecture/azure-enterprise-devops-platform.svg \
-  -b transparent
-```
-
----
-
-## Result
-
-The generated SVG was stored under:
-
-```text
-docs/images/architecture/azure-enterprise-devops-platform.svg
-```
-
-The Mermaid source remains under:
-
-```text
-diagrams/azure-enterprise-devops-platform.mmd
-```
-
----
-
-## Engineering Lesson
-
-A CLI being installed does not mean all of its runtime dependencies are available.
-
-When a tool fails after installation, distinguish between:
-
-```text
-Executable Missing
-```
-
-and:
-
-```text
-Runtime Dependency Missing
-```
-
-before reinstalling the entire tool.
-
----
-
-# Issue 36 — Incorrect Puppeteer Browser Path
-
-## Problem
-
-After the successful Puppeteer-managed browser installation, an additional local configuration attempted to use:
-
-```text
-/usr/bin/chromium
-```
-
-However, Chromium was not installed at that path.
-
-Mermaid therefore reported that the configured browser could not be found.
-
----
-
-## Root Cause
-
-The manually configured browser path overrode the already functioning Puppeteer-managed browser discovery.
-
----
-
-## Resolution
-
-The unnecessary configuration file was removed.
-
-The working configuration was allowed to use Puppeteer's installed `chrome-headless-shell`.
-
----
-
-## Engineering Lesson
-
-Once a tool works, avoid adding unnecessary configuration.
-
-Explicit configuration can override valid automatic discovery and create a new failure.
-
----
-
-# Issue 37 — Azure Resources Are Ephemeral but Documentation Is Persistent
+# Issue 36 — Azure Resources Are Ephemeral but the Platform Definition Is Persistent
 
 ## Operating Model
 
@@ -2580,52 +2728,115 @@ Then compare the image with the Kubernetes Deployment.
 
 # Troubleshooting Azure DevOps CI
 
-When CI fails, identify the stage:
+When CI fails, identify the first failing stage or step.
+
+The implemented flow includes boundaries such as:
 
 ```text
-Validation
-Filesystem Scan
+Application Validation
+        |
+        v
+Trivy Filesystem Gate
+        |
+        v
 Docker Build
-Image Scan
-Artifact Publication
+        |
+        v
+Trivy Image Gate
+        |
+        +--> JSON / SARIF
+        +--> CycloneDX SBOM
+        |
+        v
 ACR Push
+        |
+        v
+Immutable Digest Resolution
+        |
+        v
+Notation Signing
+        |
+        v
+Signature Verification
 ```
 
-Do not treat the entire CI pipeline as one troubleshooting unit.
+Do not treat the complete CI pipeline as one troubleshooting unit.
 
-Find the first failed job and investigate there.
+Find the first meaningful failure and classify it.
+
+For example:
+
+```text
+YAML compilation failure
+        !=
+Agent command failure
+```
+
+```text
+Image scan failure
+        !=
+ACR authentication failure
+```
+
+```text
+Signing failure
+        !=
+Signature trust-policy failure
+```
+
+Each belongs to a different failure domain.
 
 ---
 
 # Troubleshooting Azure DevOps CD
 
-For CD:
+The CD troubleshooting path is:
 
 ```text
-Pipeline
-   |
-   v
-Agent
-   |
-   v
-Azure Authentication
-   |
-   v
-AKS Authentication
-   |
-   v
-Kustomize
-   |
-   v
-kubectl
-   |
-   v
-Rollout
+CI Image Metadata
+       |
+       v
+Immutable Artifact Reference
+       |
+       v
+Signature Verification
+       |
+       v
+Azure DevOps Environment
+       |
+       v
+Self-Hosted Agent
+       |
+       v
+Azure / AKS Authentication
+       |
+       v
+Kubernetes Configuration
+       |
+       v
+kubectl Apply
+       |
+       v
+Rollout Validation
+       |
+       v
+Application Health
 ```
 
-Determine which boundary failed.
+Determine which boundary failed before changing configuration.
 
-If `kubectl apply` succeeds but rollout fails, move the investigation into Kubernetes.
+If signature verification fails, investigate artifact identity and Notation trust configuration before Kubernetes.
+
+If `kubectl apply` fails, investigate rendered manifests, authorization, and API errors.
+
+If `kubectl apply` succeeds but rollout validation fails, move the investigation into Kubernetes workload state:
+
+```bash
+kubectl describe pod <pod> -n <namespace>
+kubectl logs <pod> -n <namespace>
+```
+
+A successful manifest application is not equivalent to a successful application deployment.
 
 ---
 
@@ -2728,7 +2939,7 @@ no output
 
 ---
 
-# Pre-Destroy Checklist
+# Safe Environment Teardown Checklist
 
 Before destroying the Azure environment:
 
@@ -2779,9 +2990,9 @@ The Terraform backend should remain if it is intentionally managed by the separa
 
 ---
 
-# Final Screenshot Session Troubleshooting Strategy
+# Evidence-Rebuild Troubleshooting Strategy
 
-During the final evidence session, avoid making unnecessary architecture changes.
+When recreating the platform for validation or implementation evidence, avoid introducing unrelated architecture changes during the same session.
 
 The objective is:
 
@@ -2789,18 +3000,44 @@ The objective is:
 Recreate Known-Good Platform
           |
           v
-Validate
+Validate Infrastructure
           |
           v
-Run Known-Good Pipelines
+Validate Kubernetes
+          |
+          v
+Run Known-Good CI
+          |
+          v
+Run Known-Good CD
+          |
+          v
+Validate Security / Monitoring
           |
           v
 Capture Evidence
 ```
 
-If something fails, compare the recreated environment with the last known-good configuration before introducing new features.
+If the rebuilt environment behaves differently from the previous validated implementation, compare:
 
-The screenshot session is validation, not another redesign phase.
+* Terraform plan and state;
+* Azure resource configuration;
+* AKS state;
+* Kubernetes manifests;
+* pipeline inputs;
+* immutable image digest;
+* identity and RBAC configuration;
+* monitoring configuration.
+
+The rebuild session should first establish parity with the known-good platform before new functionality is introduced.
+
+---
+
+## Engineering Lesson
+
+Reproducibility testing and feature development should be separated where possible.
+
+Changing architecture while diagnosing a rebuild creates additional variables and makes root-cause analysis harder.
 
 ---
 
@@ -2999,19 +3236,31 @@ turns an incident into reusable operational knowledge.
 
 # Final Troubleshooting Model
 
-The most important troubleshooting principle from the project is to reason through dependencies.
+The most important troubleshooting principle from this project is to reason through dependencies and trust boundaries.
 
 ```text
 Source
   |
   v
-CI
+CI Validation
   |
   v
-Artifact
+Security Gates
   |
   v
-Registry
+Container Artifact
+  |
+  v
+ACR
+  |
+  v
+Immutable Digest
+  |
+  v
+Notation Signing
+  |
+  v
+Signature Verification
   |
   v
 CD
@@ -3020,24 +3269,53 @@ CD
 AKS
   |
   v
-Kubernetes
+Kubernetes Runtime
   |
   v
-Identity
+Workload Identity
   |
   v
-Secrets
+Azure RBAC
+  |
+  v
+Key Vault / Secrets Store CSI
   |
   v
 Application
   |
   v
-Monitoring
+Observability
+  |
+  v
+Alerting / Response
 ```
 
-When a failure appears at one layer, investigate both that layer and the dependency immediately below it.
+When a failure appears at one layer, investigate both that layer and the dependency immediately before it.
+
+The operating model is:
+
+```text
+Observe
+   |
+   v
+Classify Failure Domain
+   |
+   v
+Collect Evidence
+   |
+   v
+Test Hypothesis
+   |
+   v
+Apply Smallest Corrective Change
+   |
+   v
+Validate End-to-End
+   |
+   v
+Document Root Cause
+```
 
 The objective is not trial-and-error configuration.
 
-The objective is evidence-driven root-cause analysis.
-
+The objective is evidence-driven root-cause analysis that produces reusable engineering knowledge.
