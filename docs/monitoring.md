@@ -54,40 +54,56 @@ Monitoring resources are provisioned through Terraform so observability is part 
 
 # Monitoring Architecture
 
-The logical telemetry flow is:
+The platform combines AKS telemetry collection, centralized log storage, Kubernetes operational metrics, and Azure Monitor alerting.
+
+The implemented logical telemetry flow is:
 
 ```text
 AKS Cluster
     |
     +--> Kubernetes workloads
     |
-    +--> Node telemetry
+    +--> Node / container telemetry
     |
-    +--> Container telemetry
-    |
-    +--> Control-plane diagnostics
+    +--> AKS control-plane diagnostics
     |
     v
-Data Collection / Diagnostic Configuration
+Data Collection Rule
+    +
+AKS Diagnostic Settings
     |
     v
 Log Analytics Workspace
     |
-    +--> Operational Queries
+    +--> KQL operational investigation
     |
     +--> Container Insights
     |
-    v
-Azure Monitor
+    +--> Scheduled Query Evaluation
     |
     v
-Scheduled Query Alert
+Azure Monitor Alert
     |
     v
 Action Group
 ```
 
-This creates a path from workload state to operational response.
+Kubernetes runtime metrics provide an additional operational path:
+
+```text
+AKS Metrics Pipeline
+        |
+        +--> kubectl top
+        |
+        +--> Horizontal Pod Autoscaler
+        |
+        v
+Runtime Resource Visibility
+```
+
+The architecture therefore supports both centralized Azure-native telemetry and direct Kubernetes operational inspection.
+
+This creates an end-to-end path from telemetry collection through investigation and alerting while keeping the monitoring configuration reproducible through Infrastructure as Code.
 
 ---
 
@@ -119,25 +135,36 @@ This ensures that rebuilding the platform also rebuilds its monitoring configura
 
 # Log Analytics Workspace
 
-The Log Analytics Workspace acts as the centralized telemetry store for the Azure environment.
+The Log Analytics Workspace acts as the centralized log and operational telemetry store for the Azure environment.
 
-It provides a queryable location for operational data collected from AKS and associated Azure services.
+It provides a queryable location for supported AKS and Azure Monitor data collected through the platform monitoring configuration.
 
 The logical architecture is:
 
 ```text
 AKS
  |
- +--> Logs
- +--> Metrics-related telemetry
- +--> Kubernetes resource information
- +--> Diagnostic events
+ +--> Container / workload telemetry
+ |
+ +--> Kubernetes inventory information
+ |
+ +--> AKS diagnostic logs
  |
  v
 Log Analytics Workspace
+ |
+ +--> KQL queries
+ |
+ +--> Historical investigation
+ |
+ +--> Scheduled query evaluation
 ```
 
-Centralization improves troubleshooting because engineers do not need to investigate isolated node-level log files individually.
+The workspace provides centralized operational investigation rather than requiring engineers to depend only on transient pod output or individual node-level logs.
+
+Kubernetes resource metrics used by commands such as `kubectl top` and by the Horizontal Pod Autoscaler represent a related but separate runtime metrics path.
+
+This distinction is important because logs, Kubernetes resource metrics, and application metrics serve different observability purposes.
 
 ---
 
@@ -184,63 +211,84 @@ Typical operational questions include:
 
 ![Log Analytics query returning AKS-related telemetry](images/monitoring/log-analytics-query.png)
 
-*Demonstrate query-driven operational troubleshooting.*
+*Demonstrates query-driven operational troubleshooting.*
 
 ---
 
 # Container Insights
 
-Container Insights provides Kubernetes-specific monitoring for AKS.
+Azure Monitor Container Insights provides Kubernetes-specific observability for AKS.
 
-It provides visibility into resources such as:
+The platform integrates AKS monitoring with the Log Analytics Workspace through the Terraform-managed monitoring configuration.
 
-* clusters;
+Container Insights provides visibility into Kubernetes infrastructure and workload information such as:
+
+* cluster state;
 * nodes;
 * controllers;
 * pods;
-* containers.
-
-This allows platform engineers to inspect infrastructure and workload health without relying only on command-line inspection.
+* containers;
+* resource utilization;
+* workload inventory.
 
 The relationship is:
 
 ```text
-AKS
- |
- v
-Container Insights
- |
- +--> Node health
- +--> Pod health
- +--> Controller information
- +--> Container telemetry
+AKS Cluster
+      |
+      v
+Azure Monitor Container Insights
+      |
+      +--> Cluster visibility
+      +--> Node visibility
+      +--> Pod / container visibility
+      +--> Workload inventory
+      |
+      v
+Operational Investigation
 ```
+
+This gives platform engineers an Azure-native operational view of the Kubernetes environment while command-line tools remain available for immediate runtime investigation.
 
 ![AKS Container Insights showing live cluster/workload telemetry](images/monitoring/container-insights.png)
 
-*Demonstrate Azure-native Kubernetes observability.*
+*Demonstrates Azure-native Kubernetes observability.*
 
 ---
 
 # Data Collection Rule
 
-Azure Monitor Data Collection Rules define how supported telemetry is collected and routed.
+Azure Monitor Data Collection Rules define supported telemetry collection and routing behavior.
 
-The platform provisions a DCR through Terraform and associates it with AKS.
+The platform provisions the AKS monitoring DCR through Terraform and associates it with the cluster.
 
 Conceptually:
 
 ```text
-AKS
- |
- v
+AKS Cluster
+     |
+     v
 Data Collection Rule
- |
- v
+     |
+     +--> Collection configuration
+     |
+     +--> Data routing
+     |
+     v
 Log Analytics Workspace
 ```
 
-Managing this through Terraform ensures telemetry collection behavior is reproducible.
+The DCR makes telemetry collection part of the declared infrastructure configuration rather than a portal-only setting.
+
+This provides several operational advantages:
+
+* reproducible monitoring configuration;
+* version-controlled infrastructure changes;
+* consistent environment reconstruction;
+* reduced configuration drift;
+* auditable monitoring changes.
+
+The DCR itself defines collection behavior, while the DCR association connects that configuration to the AKS resource.
 
 ---
 
@@ -266,23 +314,40 @@ The association activates the relationship between the cluster and telemetry con
 
 # AKS Diagnostic Settings
 
-AKS control-plane and platform diagnostics are configured through Azure Monitor diagnostic settings.
+AKS diagnostic settings provide visibility into Azure-managed AKS platform and control-plane activity.
 
-Diagnostic settings provide a mechanism to route selected Azure resource logs to supported destinations such as Log Analytics.
+The Terraform monitoring configuration routes the selected AKS diagnostic categories to the Log Analytics Workspace.
 
 Conceptually:
 
 ```text
-AKS Platform
-     |
-     v
-Diagnostic Settings
-     |
-     v
-Log Analytics
+AKS Control Plane / Platform
+            |
+            v
+Azure Monitor Diagnostic Settings
+            |
+            v
+Log Analytics Workspace
+            |
+            v
+KQL Investigation
 ```
 
-This complements workload-level observability by providing visibility into Azure-managed platform activity.
+This telemetry complements container and workload observability.
+
+The distinction is important:
+
+```text
+Container / Workload Telemetry
+        |
+        +--> Application and Kubernetes runtime behavior
+
+AKS Diagnostic Logs
+        |
+        +--> Azure-managed AKS platform activity
+```
+
+Together, these signals provide visibility across both Kubernetes workloads and the managed AKS platform.
 
 ---
 
@@ -346,67 +411,76 @@ These commands provide immediate runtime visibility and complement centralized m
 
 # Azure Monitor Alerting
 
-Monitoring becomes operationally useful when important conditions can generate alerts.
+The platform provisions an Azure Monitor scheduled query alert through Terraform.
 
-The platform provisions an Azure Monitor scheduled query alert.
+The alert evaluates telemetry stored in Log Analytics to detect defined unhealthy workload conditions.
 
-The purpose is to detect unhealthy application pod conditions based on telemetry stored in Log Analytics.
-
-The logical path is:
+The implemented operational path is:
 
 ```text
-Application Condition
-       |
-       v
-Telemetry
-       |
-       v
-Log Analytics
-       |
-       v
-Scheduled Query
-       |
-       +--> Healthy
-       |      |
-       |      v
-       |   No Alert
-       |
-       +--> Unhealthy
-              |
-              v
-         Azure Monitor Alert
+AKS Workload
+      |
+      v
+Telemetry Collection
+      |
+      v
+Log Analytics Workspace
+      |
+      v
+Scheduled KQL Evaluation
+      |
+      +--> Condition Not Met
+      |          |
+      |          v
+      |       No Alert
+      |
+      +--> Condition Met
+                 |
+                 v
+          Azure Monitor Alert
+                 |
+                 v
+            Action Group
 ```
+
+This moves the platform beyond passive log collection.
+
+Instead of requiring an engineer to continuously inspect Kubernetes state, the monitoring system can evaluate a defined condition automatically and initiate the configured alert path.
 
 ![Azure Monitor scheduled query alert configuration](images/monitoring/application-alert-rule.png)
 
-*Demonstrate proactive workload monitoring.*
+*Demonstrates proactive workload monitoring.*
 
 ---
 
 # Scheduled Query Alerts
 
-A scheduled query alert periodically evaluates a KQL query.
-
-Instead of requiring an operator to continuously inspect logs manually, Azure Monitor evaluates the defined condition automatically.
+A scheduled query alert periodically executes a KQL query against Log Analytics and evaluates the result against a configured condition.
 
 Conceptually:
 
 ```text
 KQL Query
-   |
-   | every evaluation interval
-   v
-Condition Evaluation
-   |
-   +--> False
-   |
-   +--> True
-          |
-          v
-        Alert
+    |
+    v
+Scheduled Evaluation
+    |
+    +--> Threshold / condition not met
+    |              |
+    |              v
+    |           Healthy
+    |
+    +--> Threshold / condition met
+                   |
+                   v
+                Alert
 ```
 
-This converts observability data into an actionable operational signal.
+This creates an automated detection mechanism over centralized telemetry.
+
+The alert definition is maintained through Terraform together with the rest of the monitoring infrastructure, making the detection configuration reproducible and reviewable.
+
+In a production environment, scheduled query alerts would normally be supplemented with additional metric alerts, service-level indicators, application-specific signals, and escalation policies.
 
 ---
 
@@ -433,7 +507,7 @@ The project provisions the Action Group through Terraform.
 
 ![Azure Monitor Action Group](images/monitoring/action-group.png)
 
-*Demonstrate alert notification architecture.*
+*Demonstrates alert notification architecture.*
 
 ---
 
@@ -489,7 +563,7 @@ The HPA provides visibility into:
 
 ![kubectl get hpa showing application autoscaling resources](images/aks/hpa.png)
 
-*Demonstrate application autoscaling and operational visibility.*
+*Demonstrates application autoscaling and operational visibility.*
 
 ---
 
@@ -736,31 +810,65 @@ with Log Analytics telemetry to determine the failure cause.
 
 # Controlled Monitoring Validation
 
-Monitoring configuration should be tested rather than assumed to work.
+# Monitoring Validation Strategy
 
-A controlled failure can be introduced into a non-production workload.
+Monitoring resources should be validated at multiple levels rather than assuming that successful Terraform provisioning proves the complete operational path.
 
-For example:
+The platform can be validated through:
 
 ```text
-Temporary Invalid Deployment
+Infrastructure Validation
+        |
+        +--> Monitoring resources exist
         |
         v
-Pod Becomes Unhealthy
+Telemetry Validation
+        |
+        +--> AKS data reaches Log Analytics
         |
         v
-Telemetry Captured
+Query Validation
+        |
+        +--> KQL returns expected telemetry
         |
         v
-Alert Condition Evaluated
+Alert Validation
+        |
+        +--> Alert rule is configured and enabled
         |
         v
-Alert Confirmed
+Notification Validation
+        |
+        +--> Action Group path is verified
 ```
 
-After validation, the workload should be restored immediately.
+For a production implementation, the strongest validation would introduce a controlled failure into a non-production workload and verify the complete detection path:
 
-This proves the complete observability path rather than only verifying that Terraform created an alert resource.
+```text
+Controlled Failure
+       |
+       v
+Unhealthy Workload
+       |
+       v
+Telemetry Captured
+       |
+       v
+Alert Condition Met
+       |
+       v
+Azure Monitor Alert
+       |
+       v
+Action Group
+       |
+       v
+Operational Response
+```
+
+The workload should then be restored and recovery confirmed.
+
+This type of controlled failure testing validates the observability system as an operational capability rather than merely confirming that monitoring resources exist.
 
 ---
 
@@ -797,161 +905,276 @@ Crop or redact screenshots when required.
 
 ---
 
-# Production Monitoring Enhancements
+# Current Observability Scope
 
-A production platform could extend the current implementation with:
+The current portfolio implementation focuses on Azure-native infrastructure and Kubernetes operational observability.
 
-* Application Insights;
+Implemented capabilities include:
+
+* Terraform-managed Log Analytics Workspace;
+* AKS telemetry collection configuration;
+* Data Collection Rule;
+* Data Collection Rule association;
+* AKS diagnostic settings;
+* Azure Monitor Container Insights;
+* KQL-based operational investigation;
+* scheduled query alerting;
+* Azure Monitor Action Group;
+* Kubernetes resource metrics;
+* Horizontal Pod Autoscaler visibility;
+* AKS Cluster Autoscaler visibility;
+* Kubernetes command-line operational validation.
+
+The implementation therefore provides a monitoring foundation across infrastructure, Kubernetes workloads, centralized telemetry, and alerting.
+
+It does not claim to implement a complete enterprise SRE observability stack.
+
+---
+
+# Production Observability Enhancements
+
+A production implementation could extend the current platform with:
+
+* Azure Monitor managed service for Prometheus;
+* Azure Managed Grafana;
 * OpenTelemetry;
 * distributed tracing;
+* Application Insights;
 * custom application metrics;
-* Prometheus metrics;
-* managed Prometheus;
-* Grafana;
-* SLOs;
-* SLIs;
+* RED metrics for request-driven services;
+* USE metrics for infrastructure resources;
+* synthetic availability monitoring;
+* external health probes;
+* centralized operational dashboards;
+* SLI and SLO definitions;
 * error-budget monitoring;
-* synthetic monitoring;
-* external availability probes;
-* centralized dashboards;
-* Microsoft Sentinel integration;
+* alert escalation policies;
 * incident-management integration;
-* on-call escalation;
-* long-term telemetry retention;
-* cost-monitoring dashboards.
+* Microsoft Sentinel integration;
+* longer-term telemetry retention;
+* monitoring cost controls;
+* automated remediation workflows.
 
-The appropriate observability stack depends on application architecture, operational maturity, compliance, and cost.
+The appropriate observability architecture depends on application architecture, reliability objectives, operational maturity, regulatory requirements, telemetry volume, and cost.
 
 ---
 
 # SLI and SLO Evolution
 
-A mature platform should evolve from infrastructure monitoring toward service-level monitoring.
+The next maturity step beyond infrastructure-centric monitoring is service-level reliability measurement.
 
 For example:
 
 ```text
-Infrastructure Metric
-CPU Utilization
-       |
-       v
-Application Metric
-Request Error Rate
-       |
-       v
+Infrastructure Signal
+CPU / Memory / Pod Health
+          |
+          v
+Application Signal
+Latency / Errors / Request Rate
+          |
+          v
 Service-Level Indicator
 Successful Request Percentage
-       |
-       v
+          |
+          v
 Service-Level Objective
 99.9% Successful Requests
+          |
+          v
+Error Budget
+          |
+          v
+Reliability Decision
 ```
 
-This shifts monitoring toward user-visible reliability rather than only infrastructure status.
+This changes the operational question from:
+
+```text
+"Is the infrastructure running?"
+```
+
+to:
+
+```text
+"Is the service meeting its reliability objective for users?"
+```
+
+The current project establishes the telemetry and alerting foundation on which more advanced SLI, SLO, and error-budget practices could be built.
 
 ---
 
 # DORA and Delivery Observability
 
-Operational telemetry can also complement software delivery metrics.
+Infrastructure and application observability can also be correlated with software-delivery telemetry.
 
-Examples include:
+Useful delivery metrics include:
 
 * deployment frequency;
-* deployment failure rate;
-* mean time to recovery;
-* lead time for changes.
+* lead time for changes;
+* change failure rate;
+* failed deployment recovery time.
 
-Combining CI/CD data with production observability can help engineering teams understand both delivery speed and reliability.
+Conceptually:
+
+```text
+Azure DevOps
+     |
+     +--> Build / Deployment Data
+     |
+     v
+Delivery Performance
+
+Azure Monitor / AKS
+     |
+     +--> Runtime / Reliability Data
+     |
+     v
+Operational Performance
+```
+
+Combining delivery and runtime information helps engineering teams evaluate whether increased deployment velocity is improving or degrading service reliability.
+
+The current project does not claim to implement a complete DORA analytics platform; this represents a natural extension of the CI/CD and observability foundations.
 
 ---
 
 # Monitoring Responsibilities
 
-In a real organization, monitoring responsibilities are shared.
+In a real organization, observability responsibilities are typically shared.
 
 ## Platform Team
 
-Typically responsible for:
+Typical responsibilities include:
 
 * AKS monitoring foundation;
+* telemetry collection;
 * Log Analytics;
-* cluster telemetry;
-* alert infrastructure;
-* monitoring integrations.
+* cluster-level dashboards;
+* common alert infrastructure;
+* observability integrations.
 
 ## Application Team
 
-Typically responsible for:
+Typical responsibilities include:
 
-* application-specific metrics;
-* service-level alerts;
+* application-specific telemetry;
+* business and service metrics;
 * application dashboards;
-* application SLOs.
+* service-specific alerts;
+* application SLIs and SLOs.
 
 ## SRE / Operations
 
-May be responsible for:
+Typical responsibilities may include:
 
+* reliability objectives;
 * alert quality;
+* error-budget policy;
 * incident response;
-* reliability engineering;
 * operational readiness;
-* escalation paths.
+* escalation processes;
+* reliability improvement.
 
-The platform should provide common capabilities while allowing application teams to define service-specific signals.
+A platform should provide standardized observability capabilities without requiring the platform team to define every application-specific signal.
 
 ---
 
-# Observability Maturity Model
+# Observability Maturity
 
-The platform demonstrates several stages of monitoring maturity:
+The implementation can be viewed as part of a broader observability maturity path:
 
 ```text
 Stage 1
-Can I see the resource?
-
+Resource Visibility
+        |
+        v
 Stage 2
-Can I see workload health?
-
+Kubernetes Workload Visibility
+        |
+        v
 Stage 3
-Can I query historical telemetry?
-
+Centralized Queryable Telemetry
+        |
+        v
 Stage 4
-Can unhealthy conditions alert automatically?
-
+Automated Detection and Alerting
+        |
+        v
 Stage 5
-Can I measure service reliability?
-
+Application Telemetry and Distributed Tracing
+        |
+        v
 Stage 6
-Can I automate operational response?
+SLIs / SLOs / Error Budgets
+        |
+        v
+Stage 7
+Automated Operational Response
 ```
 
-The project primarily implements Stages 1 through 4 and establishes a foundation for more advanced reliability practices.
+This project primarily establishes Stages 1 through 4.
+
+The later stages represent production observability and SRE capabilities that can build on the monitoring foundation demonstrated here.
 
 ---
 
 # Key Monitoring Takeaways
 
-The monitoring architecture demonstrates several important principles.
+The monitoring implementation demonstrates several important platform-engineering principles.
 
-First, observability is part of platform engineering.
+First, observability is treated as infrastructure.
 
-It should be provisioned together with the infrastructure.
+Terraform provisions monitoring resources together with the platform, making telemetry collection and alerting reproducible rather than dependent on manual portal configuration.
 
-Second, collecting data and generating alerts are different responsibilities.
+Second, collection, investigation, and alerting are separate concerns.
 
-Log Analytics stores and exposes telemetry, while Azure Monitor evaluates operational conditions.
+```text
+Collect
+   |
+   v
+Store
+   |
+   v
+Query
+   |
+   v
+Detect
+   |
+   v
+Notify
+```
+
+Log Analytics provides centralized queryable telemetry, while Azure Monitor alert rules evaluate defined operational conditions and Action Groups provide the response integration point.
 
 Third, Kubernetes health exists at multiple layers.
+
+```text
+Azure Platform
+      |
+      v
+AKS
+      |
+      v
+Node
+      |
+      v
+Pod
+      |
+      v
+Container
+      |
+      v
+Application
+```
 
 Cluster availability alone does not prove application health.
 
 Fourth, autoscaling requires observability.
 
-Engineers need visibility into pods, nodes, resource utilization, and scaling decisions.
+Horizontal Pod Autoscaler behavior, pending workloads, resource utilization, and cluster capacity must be visible so engineers can determine whether scaling mechanisms are responding correctly.
 
-Finally, monitoring should lead to action.
+Fifth, monitoring must ultimately support operational decisions.
 
 The target operating model is:
 
@@ -969,9 +1192,11 @@ Respond
    |
    v
 Recover
+   |
+   v
+Improve
 ```
 
-The objective is not simply to create dashboards.
+The objective is not simply to create monitoring resources or dashboards.
 
-The objective is to enable engineers to detect problems quickly, identify their cause, and restore healthy service operation.
-
+The objective is to provide engineers with sufficient telemetry and automated detection to identify failure domains, investigate problems efficiently, and restore healthy service operation.
