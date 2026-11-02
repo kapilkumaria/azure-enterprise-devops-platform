@@ -49,3 +49,18 @@ variable "tenant_id" {
   description = "Microsoft Entra tenant ID."
   type        = string
 }
+
+
+variable "key_vault_allowed_ipv4_cidrs" {
+  description = "Approved public IPv4 CIDRs permitted to access Key Vault. Configure before deployment."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for cidr in var.key_vault_allowed_ipv4_cidrs :
+      can(cidrhost(cidr, 0)) && !strcontains(cidr, ":")
+    ])
+    error_message = "Provide valid IPv4 CIDR ranges only."
+  }
+}

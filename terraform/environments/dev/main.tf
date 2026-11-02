@@ -168,6 +168,8 @@ resource "random_string" "key_vault_suffix" {
 }
 
 module "key_vault" {
+  key_vault_allowed_ipv4_cidrs = var.key_vault_allowed_ipv4_cidrs
+
   source = "../../modules/key-vault"
 
   resource_group_name = azurerm_resource_group.platform.name
